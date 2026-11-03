@@ -10,6 +10,9 @@
         <MudTabPanel Text="@("\"Затвор\"")">
             <Arc2Component />
         </MudTabPanel>
+        <MudTabPanel Text="Пересечения">
+            <ArcAdvancedComponent />
+        </MudTabPanel>
         @* Скрыто — требует доработки, не удалять *@
         @if (false)
         {
@@ -35,8 +38,8 @@
         }
         else if (direction == SwipeDirection.RightToLeft)
         {
-            // 2 — с учётом скрытой «Произвольная» (было 3)
-            if (tabs.GetState(x => x.ActivePanelIndex) < 2)
+            // 3 — последняя видимая вкладка («Пересечения»); скрытая «Произвольная» не считается
+            if (tabs.GetState(x => x.ActivePanelIndex) < 3)
             {
                 tabs.ActivatePanelAsync(tabs.GetState(x => x.ActivePanelIndex) + 1);
             }
