@@ -16,11 +16,13 @@
                                    OnClick="SaveWorkAsync" title="Сохранить работу (.cndc)">"Сохранить работу"</MudIconButton>
                     <MudFileUpload T="IBrowserFile" Accept=".cndc" FilesChanged="OpenWorkAsync" Hidden="false"
                                    InputStyle="opacity:0; position:absolute; width:100%; height:100%; top:0; left:0; cursor:pointer; z-index:1"
-                                   Style="position: relative; display: inline-flex;">
+                                   Style="position: relative; display: inline-flex; align-items: stretch;">
                         <CustomContent>
-                            <MudIconButton Icon="@Icons.Material.TwoTone.FolderOpen" Variant="Variant.Outlined" Class="ml-1"
+                            <MudIconButton Icon="@Icons.Material.TwoTone.FolderOpen" Variant="Variant.Outlined" Class="ml-1" Style="height: 100%;"
                                            title="Открыть работу (.cndc)">"Открыть работу"</MudIconButton>
                         </CustomContent>
+                        @* без этого после выбора файла под кнопкой появляется плашка с именем и панель раздувается *@
+                        <SelectedTemplate></SelectedTemplate>
                     </MudFileUpload>
                     <MudHidden Breakpoint="Breakpoint.SmAndDown">
                         <MudButton EndIcon="@Icons.Material.TwoTone.Settings" OnClick="OpenSetupMode" Variant="Variant.Outlined"

@@ -151,21 +151,36 @@ public class ToolTipCompensationTests
     // ------------------------------------------------------------------
 
     [Fact]
-    public void InternalMirrorsExternal_SameCenterOppositeXOffset()
+    public void InternalCompensation_IsMirrorImageOfExternal()
     {
-        var contour = new List<Element>
+        // Внутреннее точение — то же самое, что наружное, отражённое по X: воздух с другой
+        // стороны контура. Зеркальный контур (X' = 80 − X, направления дуг меняются на обратные)
+        // с внутренним инструментом даёт зеркало результата наружного. Для наклонных стыков центры
+        // пластины у наружного и внутреннего инструмента разные, поэтому «одинаковый центр» не
+        // свойство, а зеркальность — свойство.
+        var external = new List<Element>
         {
-            new Point(40, 0),
-            new Point(30, -10),
-            new Point(20, -10),
+            new Point(20, 0),
+            new Line(30, -10),
+            new Arc(40, -20, 8, Direction.CCW),
+            new Line(40, -30),
         };
+        var mirrored = external.Select(e => e switch
+        {
+            Point p => (Element)new Point(80 - p.X!.Value, p.Z, p.Blunt),
+            Line l => new Line(80 - l.X!.Value, l.Z, l.Angle, l.Blunt, l.BluntType),
+            Arc a => new Arc(80 - a.X!.Value, a.Z, a.Radius, a.Direction == Direction.CCW ? Direction.CW : Direction.CCW),
+            _ => e,
+        }).ToList();
 
-        var ext = ToolTipCompensation.Compensate(contour, R, ToolNoseVector.TurningExternal);
-        var intr = ToolTipCompensation.Compensate(contour, R, ToolNoseVector.BoringInternal);
+        var ext = ToolTipCompensation.Compensate(external, R, ToolNoseVector.TurningExternal);
+        var intr = ToolTipCompensation.Compensate(mirrored, R, ToolNoseVector.BoringInternal);
 
-        // X в радиусе: разница 2R = 1.6 -> в диаметре 3.2
-        Assert.Equal(intr[1].X!.Value, ext[1].X!.Value + 3.2, 4);
-        Assert.Equal(intr[1].Z!.Value, ext[1].Z!.Value, 4);
+        for (var i = 0; i < ext.Count; i++)
+        {
+            Assert.Equal(80 - ext[i].X!.Value, intr[i].X!.Value, 4);
+            Assert.Equal(ext[i].Z!.Value, intr[i].Z!.Value, 4);
+        }
     }
 
     // ------------------------------------------------------------------

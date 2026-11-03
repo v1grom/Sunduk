@@ -191,6 +191,20 @@ namespace Sunduk.PWA.Infrastructure
         }
 
         /// <summary>
+        /// Приводит введённое значение к номеру токарного инструмента: четыре цифры, номер
+        /// инструмента и номер коррекции одинаковые (0101, 0202 … 1212). Одно-двузначный ввод —
+        /// это сам номер («5» → 0505), трёх-четырёхзначный — берётся номер инструмента из старших
+        /// разрядов («507» → 0505, «0507» → 0505). Ноль и отрицательные числа дают 0101.
+        /// </summary>
+        public static int TurningToolNumber(int value)
+        {
+            if (value <= 0) return 101;
+            var tool = value >= 100 ? value / 100 : value;
+            tool = Math.Clamp(tool, 1, 99);
+            return tool * 101;
+        }
+
+        /// <summary>
         /// Равномерно или вручную распределённые отверстия по окружности (для сверления/резьбофрезерования по цилиндру)
         /// </summary>
         public static List<Hole> PolarHoles(int holesCount, double radius, double startAngle, bool evenly, List<Hole> manualHoles)

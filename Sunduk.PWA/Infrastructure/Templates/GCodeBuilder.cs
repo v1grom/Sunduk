@@ -114,7 +114,7 @@ namespace Sunduk.PWA.Infrastructure.Templates
         /// шпинделя (<paramref name="spindleOn"/>, см. <see cref="Util.SpindleOn"/> — уже готовая
         /// строка вида "S200 M3", формирует вызывающий код) приклеиваются к первому рапиду (G0).
         /// </summary>
-        public GCodeBuilder Contour(List<Element> contour, bool feedOnFirstMove, double feed, double toolRadius = 0, string spindleOn = null)
+        public GCodeBuilder Contour(List<Element> contour, bool feedOnFirstMove, double feed, double toolRadius = 0, string spindleOn = null, double approachClearance = 0, bool externalTool = true)
         {
             if (contour is null || contour.Count == 0) return this;
             double? prevX = null;
@@ -148,15 +148,39 @@ namespace Sunduk.PWA.Infrastructure.Templates
                     if (startSuffix.Length > 0)
                     {
                         var compensated = CompensatedBluntSize(startBlunt, startBluntType, toolRadius);
-                        var approachX = x.Value + 2 * compensated;
+                        // «мнимая линия» по торцу: у наружной обработки торец идёт от оси к узлу (подвод снизу), у
+                        // внутренней — от узла вверх
+                        var approachX = externalTool ? x.Value - 2 * compensated : x.Value + 2 * compensated;
                         var firstFeed = feedOnFirstMove ? $" F{feed.NC()}" : string.Empty;
                         if (feedOnFirstMove) feedEmitted = true;
-                        Line($"G0 X{approachX.NC(0)} Z{z.Value.NC()}{spindleSuffix}");
-                        Line($"G1 X{x.Value.NC(0)} Z{z.Value.NC()}{startSuffix}{firstFeed}");
+                        if (approachClearance > 0)
+                        {
+                            // сначала с зазором по Z, затем рабочий ход к торцу и «мнимая линия» по нему
+                            Line($"G0 X{approachX.NC()} Z{(z.Value + approachClearance).NC()}{spindleSuffix}");
+                            Line($"G1 Z{z.Value.NC()}{firstFeed}");
+                            Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{startSuffix}");
+                        }
+                        else
+                        {
+                            Line($"G0 X{approachX.NC()} Z{z.Value.NC()}{spindleSuffix}");
+                            Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{startSuffix}{firstFeed}");
+                        }
                     }
                     else
                     {
-                        Line($"G0 X{x.Value.NC(0)} Z{z.Value.NC()}{spindleSuffix}");
+                        if (approachClearance > 0)
+                        {
+                            // подвод с зазором по Z: рапид к стартовой точке на расстоянии от торца,
+                            // затем рабочий ход на сам узел — инструмент не идёт на деталь по диагонали
+                            var firstFeed = feedOnFirstMove ? $" F{feed.NC()}" : string.Empty;
+                            if (feedOnFirstMove) feedEmitted = true;
+                            Line($"G0 X{x.Value.NC()} Z{(z.Value + approachClearance).NC()}{spindleSuffix}");
+                            Line($"G1 Z{z.Value.NC()}{firstFeed}");
+                        }
+                        else
+                        {
+                            Line($"G0 X{x.Value.NC()} Z{z.Value.NC()}{spindleSuffix}");
+                        }
                     }
                     prevX = x; prevZ = z;
                     continue;
@@ -167,16 +191,16 @@ namespace Sunduk.PWA.Infrastructure.Templates
                 switch (element)
                 {
                     case Arc arc when IsValidArc(arc, prevX, prevZ):
-                        Line($"{(arc.Direction == Sunduk.Geometry.Direction.CW ? "G2" : "G3")} X{x.Value.NC(0)} Z{z.Value.NC()} R{arc.Radius.NC()}{speedFeedSuffix}");
+                        Line($"{(arc.Direction == Sunduk.Geometry.Direction.CW ? "G2" : "G3")} X{x.Value.NC()} Z{z.Value.NC()} R{arc.Radius.NC()}{speedFeedSuffix}");
                         break;
                     case Point point:
-                        Line($"G1 X{x.Value.NC(0)} Z{z.Value.NC()}{BluntSuffix(point.Blunt, Blunt.Radius, toolRadius, i, contour)}{speedFeedSuffix}");
+                        Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{BluntSuffix(point.Blunt, Blunt.Radius, toolRadius, i, contour)}{speedFeedSuffix}");
                         break;
                     case Sunduk.Geometry.ContourElements.Line line:
-                        Line($"G1 X{x.Value.NC(0)} Z{z.Value.NC()}{BluntSuffix(line.Blunt, line.BluntType, toolRadius, i, contour)}{speedFeedSuffix}");
+                        Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{BluntSuffix(line.Blunt, line.BluntType, toolRadius, i, contour)}{speedFeedSuffix}");
                         break;
                     default:
-                        Line($"G1 X{x.Value.NC(0)} Z{z.Value.NC()}{speedFeedSuffix}");
+                        Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{speedFeedSuffix}");
                         break;
                 }
                 prevX = x; prevZ = z;

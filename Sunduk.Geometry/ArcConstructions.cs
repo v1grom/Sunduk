@@ -124,6 +124,25 @@ namespace Sunduk.Geometry
         /// <summary>Допуск совпадения/касания, мм.</summary>
         public const double Eps = 1e-6;
 
+        // ------------------------------------------------------------------ дуга контура
+
+        /// <summary>
+        /// Центр дуги G2/G3 по её концам, радиусу и направлению (X — радиус). CCW — центр слева от
+        /// хорды (по ходу от начала к концу в плоскости «Z вправо, X вверх»), CW — справа; берётся
+        /// дуга не больше полуокружности, как в R-форме G2/G3. null — радиус меньше половины хорды
+        /// (такая дуга в G-коде вырождается в прямую) или концы совпадают.
+        /// </summary>
+        public static (double X, double Z)? ArcCenter(double x1, double z1, double x2, double z2, double radius, Direction direction)
+        {
+            var dz = z2 - z1;
+            var dx = x2 - x1;
+            var len = Math.Sqrt(dz * dz + dx * dx);
+            if (len < 1e-12 || radius <= 0 || radius * 2 < len - 1e-9) return null;
+            var h = Math.Sqrt(Math.Max(radius * radius - len * len / 4, 0));
+            var sign = direction == Direction.CCW ? 1 : -1;
+            return ((x1 + x2) / 2 + sign * h * dz / len, (z1 + z2) / 2 - sign * h * dx / len);
+        }
+
         // ------------------------------------------------------------------ пересечения
 
         /// <summary>Пересечение двух окружностей. Точки упорядочены: сначала слева от вектора c1→c2

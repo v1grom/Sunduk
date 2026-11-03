@@ -159,7 +159,7 @@ namespace Sunduk.PWA.Infrastructure.Visualization
                 if (!HasStock || !Valid) return string.Empty;
                 var sb = new StringBuilder();
                 foreach (var run in Runs(Stock!.ExternalSegments)) sb.Append(HalfPolygon(run));
-                foreach (var run in Runs(Stock.InternalSegments)) sb.Append(HalfPolygon(run));
+                foreach (var run in Runs(Stock.EffectiveInternalSegments)) sb.Append(HalfPolygon(run));
                 return sb.ToString().TrimEnd();
             }
         }
@@ -192,7 +192,7 @@ namespace Sunduk.PWA.Infrastructure.Visualization
             {
                 if (!HasStock || !Valid) return string.Empty;
                 var sb = new StringBuilder();
-                foreach (var run in Runs(Stock!.InternalSegments))
+                foreach (var run in Runs(Stock!.EffectiveInternalSegments))
                 {
                     sb.Append("M ").Append(F(X(run[0].From))).Append(',').Append(F(Y(0))).Append(' ');
                     foreach (var s in run)

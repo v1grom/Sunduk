@@ -6,7 +6,7 @@
     </MudSelect>
 </MudItem>
 <MudItem xs="12" md="4">
-    <MudSelect Value="Tool" ValueChanged="OnToolChanged" Label="Инструмент" T="Tool" Variant="Variant.Text" Margin="Margin.Dense">
+    <MudSelect Value="Tool" ValueChanged="OnToolChanged" Label="Инструмент" T="Tool" ToStringFunc="@(t => t?.PickerLabel ?? string.Empty)" Variant="Variant.Text" Margin="Margin.Dense">
         @if (MachineType == MachineType.Turning)
         {
             @foreach (var tool in Tools.Where(x => x is TurningDrillingTool))
@@ -149,6 +149,15 @@
     <MudTextField T="string" Underline="false" Label="Предпросмотр" Style="font-family: 'JetBrains Mono', monospace; font-size: medium;"
                   ReadOnly="true" Variant="Variant.Text" Text="@("\n" + ExampleText.Trim('\n'))" Lines="@(ExampleText.Trim('\n').Count(x => x == '\n') + 3)" />
 </MudItem>
+@if (Machine?.MachineType == MachineType.Turning && WorkpieceExternalDiameter > 0 && WorkpieceLength > 0)
+{
+    <MudItem xs="12" Class="mt-4">
+        <StockProfileComponent Program="Program" Candidate="@(string.IsNullOrEmpty(ExampleText) ? null : CurrentSequence)" EditSequence="SequenceToEdit"
+                               ExternalDiameter="WorkpieceExternalDiameter" InternalDiameter="WorkpieceInternalDiameter"
+                               WorkpieceLength="WorkpieceLength" FacingAllowance="WorkpieceFacingAllowance"
+                               Height="260" Label="Заготовка с учётом уже сделанного (жёлтым — что снимет этот переход)" />
+    </MudItem>
+}
 <MudItem Class="d-flex flex-row-reverse py-0 px-0 mt-4">
     <MudButton Variant="Variant.Outlined" Size="Size.Large"
                EndIcon="@Icons.Material.TwoTone.PlaylistAdd" Color="Color.Primary"
@@ -159,6 +168,11 @@
 
 @code {
     [Parameter] public Machine Machine { get; set; }
+    [Parameter] public List<Sequence> Program { get; set; }
+    [Parameter] public double WorkpieceExternalDiameter { get; set; }
+    [Parameter] public double WorkpieceInternalDiameter { get; set; }
+    [Parameter] public double WorkpieceLength { get; set; }
+    [Parameter] public double WorkpieceFacingAllowance { get; set; }
     [Parameter] public MachineType MachineType { get; set; }
     [Parameter] public Material WorkpieceMaterial { get; set; }
     [Parameter] public CoordinateSystem CoordinateSystem { get; set; }
@@ -216,7 +230,7 @@
         {
             case TurningHighSpeedDrillingSequence tHs:
                 DrillingSequence = DrillingSequences.HighSpeedDrilling;
-                Tool = tHs.Tool;
+                Tool = tHs.Tool.FindIn(Tools);
                 _DrillStart = tHs.StartZ.ToPrettyString();
                 _DrillEnd = tHs.EndZ.ToPrettyString();
                 SpeedFinish = tHs.Speed;
@@ -226,7 +240,7 @@
                 break;
             case MillingHighSpeedDrillingSequence mHs:
                 DrillingSequence = DrillingSequences.HighSpeedDrilling;
-                Tool = mHs.Tool;
+                Tool = mHs.Tool.FindIn(Tools);
                 _DrillStart = mHs.StartZ.ToPrettyString();
                 _DrillEnd = mHs.EndZ.ToPrettyString();
                 SpeedFinish = mHs.Speed;
@@ -237,7 +251,7 @@
                 break;
             case TurningPeckDrillingSequence tPeck:
                 DrillingSequence = DrillingSequences.PeckingDrilling;
-                Tool = tPeck.Tool;
+                Tool = tPeck.Tool.FindIn(Tools);
                 _PeckingDepth = tPeck.Depth.ToPrettyString();
                 _DrillStart = tPeck.StartZ.ToPrettyString();
                 _DrillEnd = tPeck.EndZ.ToPrettyString();
@@ -248,7 +262,7 @@
                 break;
             case MillingPeckDrillingSequence mPeck:
                 DrillingSequence = DrillingSequences.PeckingDrilling;
-                Tool = mPeck.Tool;
+                Tool = mPeck.Tool.FindIn(Tools);
                 _PeckingDepth = mPeck.Depth.ToPrettyString();
                 _DrillStart = mPeck.StartZ.ToPrettyString();
                 _DrillEnd = mPeck.EndZ.ToPrettyString();
@@ -260,7 +274,7 @@
                 break;
             case TurningPeckDeepDrillingSequence tDeep:
                 DrillingSequence = DrillingSequences.PeckingDeepDrilling;
-                Tool = tDeep.Tool;
+                Tool = tDeep.Tool.FindIn(Tools);
                 _PeckingDeepDepth = tDeep.Depth.ToPrettyString();
                 _DrillStart = tDeep.StartZ.ToPrettyString();
                 _DrillEnd = tDeep.EndZ.ToPrettyString();
@@ -271,7 +285,7 @@
                 break;
             case MillingPeckDeepDrillingSequence mDeep:
                 DrillingSequence = DrillingSequences.PeckingDeepDrilling;
-                Tool = mDeep.Tool;
+                Tool = mDeep.Tool.FindIn(Tools);
                 _PeckingDeepDepth = mDeep.Depth.ToPrettyString();
                 _DrillStart = mDeep.StartZ.ToPrettyString();
                 _DrillEnd = mDeep.EndZ.ToPrettyString();

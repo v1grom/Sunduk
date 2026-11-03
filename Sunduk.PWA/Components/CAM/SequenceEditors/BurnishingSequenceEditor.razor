@@ -1,5 +1,5 @@
 <MudItem xs="12" md="4">
-    <MudSelect Value="Tool" ValueChanged="OnToolChanged" Variant="Variant.Text" Margin="Margin.Dense" Label="Инструмент" T="Tool">
+    <MudSelect Value="Tool" ValueChanged="OnToolChanged" Variant="Variant.Text" Margin="Margin.Dense" Label="Инструмент" T="Tool" ToStringFunc="@(t => t?.PickerLabel ?? string.Empty)">
         @foreach (var tool in Tools.Where(x => x is TurningBurnishingTool))
         {
             <MudSelectItem Value="@tool">@tool.PickerLabel</MudSelectItem>
@@ -45,6 +45,15 @@
     <MudTextField T="string" Underline="false" Label="Предпросмотр" Style="font-family: 'JetBrains Mono', monospace; font-size: medium;"
                   ReadOnly="true" Variant="Variant.Text" Text="@("\n" + ExampleText.Trim('\n'))" Lines="@(ExampleText.Trim('\n').Count(x => x == '\n') + 3)" />
 </MudItem>
+@if (Machine?.MachineType == MachineType.Turning && WorkpieceExternalDiameter > 0 && WorkpieceLength > 0)
+{
+    <MudItem xs="12" Class="mt-4">
+        <StockProfileComponent Program="Program" Candidate="@(string.IsNullOrEmpty(ExampleText) ? null : CurrentSequence)" EditSequence="SequenceToEdit"
+                               ExternalDiameter="WorkpieceExternalDiameter" InternalDiameter="WorkpieceInternalDiameter"
+                               WorkpieceLength="WorkpieceLength" FacingAllowance="WorkpieceFacingAllowance"
+                               Height="260" Label="Заготовка с учётом уже сделанного (жёлтым — что снимет этот переход)" />
+    </MudItem>
+}
 <MudItem Class="d-flex flex-row-reverse py-0 px-0 mt-4">
     <MudButton Variant="Variant.Outlined" Size="Size.Large"
                EndIcon="@Icons.Material.TwoTone.PlaylistAdd" Color="Color.Primary"
@@ -55,6 +64,11 @@
 
 @code {
     [Parameter] public Machine Machine { get; set; }
+    [Parameter] public List<Sequence> Program { get; set; }
+    [Parameter] public double WorkpieceExternalDiameter { get; set; }
+    [Parameter] public double WorkpieceInternalDiameter { get; set; }
+    [Parameter] public double WorkpieceLength { get; set; }
+    [Parameter] public double WorkpieceFacingAllowance { get; set; }
     [Parameter] public CoordinateSystem CoordinateSystem { get; set; }
     [Parameter] public List<Tool> Tools { get; set; }
     [Parameter] public Sequence SequenceToEdit { get; set; }
@@ -85,7 +99,7 @@
     {
         if (sequence is TurningBurnishingSequence burn)
         {
-            Tool = burn.Tool;
+            Tool = burn.Tool.FindIn(Tools);
             _BurnishingDiameter = burn.Diameter.ToPrettyString();
             _BurnishingStart = burn.StartZ.ToPrettyString();
             _BurnishingEnd = burn.EndZ.ToPrettyString();

@@ -114,12 +114,15 @@ namespace Sunduk.PWA.Infrastructure.Visualization
 
         /// <summary>Строит траекторию по контуру. null — контур неполный (меньше двух узлов с
         /// координатами).</summary>
-        public static TurningToolpath? Build(IReadOnlyList<Element> contour)
+        /// <param name="external">Наружная обработка: торец детали перед первым узлом лежит ниже него (от
+        /// оси до узла), и скругление на старте — скругление выпуклого ребра. У внутренней обработки
+        /// материал над контуром, торец идёт от узла вверх.</param>
+        public static TurningToolpath? Build(IReadOnlyList<Element> contour, bool external = true)
         {
             var resolved = Resolve(contour);
             if (resolved is null) return null;
             var path = new TurningToolpath();
-            path.Nominal.AddRange(Moves(resolved, path.Corners));
+            path.Nominal.AddRange(Moves(resolved, path.Corners, external));
             return path;
         }
 
@@ -136,7 +139,7 @@ namespace Sunduk.PWA.Infrastructure.Visualization
             public PathMove? Move;
         }
 
-        private static List<PathMove> Moves(List<Element> nodes, List<CornerMark>? marks = null)
+        private static List<PathMove> Moves(List<Element> nodes, List<CornerMark>? marks = null, bool external = true)
         {
             var n = nodes.Count;
             var pts = nodes.Select(e => new Pt(e.Z!.Value, e.X!.Value / 2)).ToArray();
@@ -151,7 +154,7 @@ namespace Sunduk.PWA.Infrastructure.Visualization
             var corners = new Corner[n];
             for (var i = 0; i < n; i++) corners[i] = new Corner { In = pts[i], Out = pts[i] };
 
-            // мнимый торец перед первым узлом — вертикальный (по X), инструмент идёт от большего диаметра
+            // мнимый торец перед первым узлом — вертикальный (по X)
             for (var i = 0; i < n - 1; i++)
             {
                 var (blunt, type) = nodes[i] switch
@@ -170,7 +173,9 @@ namespace Sunduk.PWA.Infrastructure.Visualization
                 Pt a;
                 if (i == 0)
                 {
-                    a = new Pt(pts[0].Z, pts[0].R + size); // мнимый торец выше первого узла
+                    // мнимый торец перед первым узлом: у наружной обработки это весь торец детали от оси
+                    // до узла (ниже узла), у внутренней — продолжение вверх от узла
+                    a = external ? new Pt(pts[0].Z, 0) : new Pt(pts[0].Z, pts[0].R + size * 4);
                 }
                 else
                 {
