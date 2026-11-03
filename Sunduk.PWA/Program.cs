@@ -78,6 +78,7 @@ namespace Sunduk.PWA
             builder.Services.AddSingleton<NippleState>();
             builder.Services.AddSingleton<Arc2State>();
             builder.Services.AddSingleton<ArcGeneralState>();
+            builder.Services.AddSingleton<ArcAdvancedState>();
             builder.Services.AddSingleton<ChamferState>();
             builder.Services.AddSingleton<ThreadTurningState>();
             builder.Services.AddSingleton<ToleranceState>();
