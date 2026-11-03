@@ -1,16 +1,40 @@
 @using Sunduk.PWA.Infrastructure.Sequences.Base
-<MudField Label="Текущее состояние заготовки" Variant="Variant.Filled" Margin="Margin.Dense" Underline="false">
+<MudField Label="@Label" Variant="Variant.Filled" Margin="Margin.Dense" Underline="false">
     <MudPaper Outlined="true">
         <div style="text-align: center;">
-            <svg height="140" width="100%" xmlns="http://www.w3.org/2000/svg" viewBox="@ViewBox" preserveAspectRatio="xMidYMid meet">
+            <svg height="@Height" width="100%" xmlns="http://www.w3.org/2000/svg" viewBox="@ViewBox" preserveAspectRatio="xMidYMid meet">
+                @if (Candidate is not null)
+                {
+                    @* что снимет этот переход: материал «до» подсвечен, поверх него непрозрачно закрашен остаток «после» *@
+                    var removed = RemovedFill;
+                    if (!string.IsNullOrEmpty(removed))
+                    {
+                        <path fill="var(--mud-palette-warning)" fill-opacity="0.6" fill-rule="evenodd" stroke="none" d="@removed"/>
+                        <path fill="var(--mud-palette-surface)" fill-rule="evenodd" stroke="none" d="@(ExternalPath + " " + InternalHolePath + " " + RingHolePath)"/>
+                    }
+                }
                 @if (!string.IsNullOrEmpty(ExternalPath))
                 {
-                    <path fill="var(--mud-palette-primary)" fill-opacity="0.25" fill-rule="evenodd" stroke="none" d="@(ExternalPath + " " + InternalHolePath)"/>
-                    <path fill="none" stroke="var(--mud-palette-primary)" stroke-width="@Math.Max(1, Scale * 0.25)" d="@ExternalOutlinePath"/>
+                    <path fill="var(--mud-palette-primary)" fill-opacity="0.25" fill-rule="evenodd" stroke="none" d="@(ExternalPath + " " + InternalHolePath + " " + RingHolePath)"/>
+                    @* обводка детали не идёт поверх отверстия: там просто дыра, как у канавки *@
+                    <mask id="@_maskId" maskUnits="userSpaceOnUse" x="-10000" y="-10000" width="20000" height="20000">
+                        <rect x="-10000" y="-10000" width="20000" height="20000" fill="white"/>
+                        <path fill="black" stroke="black" stroke-width="@Fmt(Math.Max(3, Scale * 0.8))" stroke-linejoin="round" d="@(InternalHolePath + " " + RingHolePath)"/>
+                    </mask>
+                    <path fill="none" stroke="var(--mud-palette-primary)" stroke-width="@Math.Max(1, Scale * 0.25)" mask="url(#@_maskId)" d="@ExternalOutlinePath"/>
+                }
+                @if (!string.IsNullOrEmpty(RingOutlinePath))
+                {
+                    <path fill="none" stroke="var(--mud-palette-primary)" stroke-width="@Math.Max(1, Scale * 0.25)" d="@RingOutlinePath"/>
+                }
+                @if (Valid)
+                {
+                    @* резьба (условно): линия другого цвета по среднему диаметру *@
+                    <path fill="none" stroke="var(--mud-palette-success)" stroke-width="@Math.Max(1, Scale * 0.3)" d="@ThreadPath"/>
                 }
                 @if (!string.IsNullOrEmpty(InternalHoleOutlinePath))
                 {
-                    <path fill="none" stroke="var(--mud-palette-primary)" stroke-width="@Math.Max(1, Scale * 0.2)" stroke-dasharray="3,2" d="@InternalHoleOutlinePath"/>
+                    <path fill="none" stroke="var(--mud-palette-primary)" stroke-width="@Math.Max(1, Scale * 0.25)" d="@InternalHoleOutlinePath"/>
                 }
                 @if (Valid)
                 {
@@ -41,6 +65,25 @@
     [Parameter]
     public List<Sequence> Program { get; set; } = new();
 
+    /// <summary>Высота рисунка, px (картинка масштабируется по ней).</summary>
+    [Parameter]
+    public int Height { get; set; } = 140;
+
+    /// <summary>Подпись окна.</summary>
+    [Parameter]
+    public string Label { get; set; } = "Текущее состояние заготовки";
+
+    /// <summary>Переход, который сейчас настраивается (ещё не в программе или заменяющий
+    /// <see cref="EditSequence"/>) — рисуется поверх заготовки с учётом уже выполненных переходов;
+    /// подсвечивается материал, который он снимет. null — просто текущая заготовка.</summary>
+    [Parameter]
+    public Sequence? Candidate { get; set; }
+
+    /// <summary>Редактируемый переход из <see cref="Program"/>: заготовка «до» считается по
+    /// переходам перед ним, а не по всей программе.</summary>
+    [Parameter]
+    public Sequence? EditSequence { get; set; }
+
     [Parameter]
     public double ExternalDiameter { get; set; }
 
@@ -61,7 +104,145 @@
     double VisibleFromZ => -WorkpieceLength - EdgeMargin;
     double VisibleToZ => Math.Max(FacingAllowance, 0) + EdgeMargin;
 
-    Infrastructure.StockProfile Profile => Infrastructure.StockProfile.Build(Program ?? new List<Sequence>(), Program?.Count ?? 0, ExternalDiameter, InternalDiameter, FacingAllowance);
+    /// <summary>Переходы, уже выполненные к моменту настраиваемого перехода.</summary>
+    List<Sequence> BaseProgram
+    {
+        get
+        {
+            var all = Program ?? new List<Sequence>();
+            if (EditSequence is not null)
+            {
+                var index = all.IndexOf(EditSequence);
+                if (index >= 0) return all.Take(index).ToList();
+            }
+            return all;
+        }
+    }
+
+    Infrastructure.StockProfile? _forced;
+
+    /// <summary>Кольцевые полости (торцевые канавки) как замкнутые полигоны сверху и снизу от оси — вычитаются
+    /// из заливки вместе с отверстиями (evenodd); кольцо лежит внутри материала, поэтому ничего не создаёт.</summary>
+    string RingHolePath
+    {
+        get
+        {
+            if (!Valid) return string.Empty;
+            var sb = new System.Text.StringBuilder();
+            foreach (var (fromZ, toZ, inner, outer) in Profile.EffectiveRings)
+            {
+                var from = Math.Max(fromZ, VisibleFromZ);
+                var to = Math.Min(toZ, VisibleToZ);
+                if (from >= to) continue;
+                foreach (var sign in new[] { 1, -1 })
+                {
+                    var y1 = sign * -inner * Scale;
+                    var y2 = sign * -outer * Scale;
+                    sb.Append("M ").Append(Fmt(SX(from))).Append(',').Append(Fmt(y1)).Append(" L ").Append(Fmt(SX(to))).Append(',').Append(Fmt(y1))
+                      .Append(" L ").Append(Fmt(SX(to))).Append(',').Append(Fmt(y2)).Append(" L ").Append(Fmt(SX(from))).Append(',').Append(Fmt(y2)).Append(" Z ");
+                }
+            }
+            return sb.ToString().TrimEnd();
+        }
+    }
+
+    /// <summary>Стенки кольцевых полостей одним контуром по ступеням (а не прямоугольниками по каждому
+    /// интервалу — у фаски наружный диаметр меняется десятками ступеней). Торец, выходящий наружу, не
+    /// рисуется: там проём, как у канавки.</summary>
+    string RingOutlinePath
+    {
+        get
+        {
+            if (!Valid) return string.Empty;
+            const double epsilon = 1e-6;
+            var rings = Profile.EffectiveRings
+                .Select(r => (FromZ: Math.Max(r.FromZ, VisibleFromZ), ToZ: Math.Min(r.ToZ, VisibleToZ), r.InnerRadius, r.OuterRadius))
+                .Where(r => r.FromZ < r.ToZ)
+                .OrderBy(r => r.FromZ)
+                .ToList();
+            var sb = new System.Text.StringBuilder();
+            var group = new List<(double FromZ, double ToZ, double InnerRadius, double OuterRadius)>();
+            void Flush()
+            {
+                if (group.Count == 0) return;
+                var openLeft = Profile.ExternalDiameterAt(group[0].FromZ - epsilon) <= 0;
+                var openRight = Profile.ExternalDiameterAt(group[^1].ToZ + epsilon) <= 0;
+                foreach (var sign in new[] { 1, -1 })
+                {
+                    foreach (var pick in new[] { 0, 1 })
+                    {
+                        double R((double FromZ, double ToZ, double InnerRadius, double OuterRadius) g) => sign * -(pick == 0 ? g.InnerRadius : g.OuterRadius) * Scale;
+                        sb.Append("M ").Append(Fmt(SX(group[0].FromZ))).Append(',').Append(Fmt(R(group[0]))).Append(' ');
+                        foreach (var g in group)
+                        {
+                            sb.Append("L ").Append(Fmt(SX(g.FromZ))).Append(',').Append(Fmt(R(g))).Append(' ');
+                            sb.Append("L ").Append(Fmt(SX(g.ToZ))).Append(',').Append(Fmt(R(g))).Append(' ');
+                        }
+                    }
+                    double Ry((double FromZ, double ToZ, double InnerRadius, double OuterRadius) g, int pick) => sign * -(pick == 0 ? g.InnerRadius : g.OuterRadius) * Scale;
+                    if (!openLeft) sb.Append("M ").Append(Fmt(SX(group[0].FromZ))).Append(',').Append(Fmt(Ry(group[0], 0))).Append(" L ").Append(Fmt(SX(group[0].FromZ))).Append(',').Append(Fmt(Ry(group[0], 1))).Append(' ');
+                    if (!openRight) sb.Append("M ").Append(Fmt(SX(group[^1].ToZ))).Append(',').Append(Fmt(Ry(group[^1], 0))).Append(" L ").Append(Fmt(SX(group[^1].ToZ))).Append(',').Append(Fmt(Ry(group[^1], 1))).Append(' ');
+                }
+                group = new();
+            }
+            foreach (var r in rings)
+            {
+                if (group.Count > 0 && Math.Abs(group[^1].ToZ - r.FromZ) > epsilon) Flush();
+                group.Add(r);
+            }
+            Flush();
+            return sb.ToString().TrimEnd();
+        }
+    }
+
+    /// <summary>Идентификатор маски (на странице может быть несколько таких окон).</summary>
+    readonly string _maskId = "stock-mask-" + Guid.NewGuid().ToString("N");
+
+    /// <summary>Линии резьбы по среднему диаметру: сверху и снизу (зеркально) на длине нарезания.</summary>
+    string ThreadPath
+    {
+        get
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var t in Profile.Threads)
+            {
+                var from = Math.Max(t.FromZ, VisibleFromZ);
+                var to = Math.Min(t.ToZ, VisibleToZ);
+                if (from >= to) continue;
+                foreach (var sign in new[] { 1, -1 })
+                {
+                    var y = sign * SY(t.MeanDiameter);
+                    sb.Append("M ").Append(Fmt(SX(from))).Append(',').Append(Fmt(y)).Append(" L ").Append(Fmt(SX(to))).Append(',').Append(Fmt(y)).Append(' ');
+                }
+            }
+            return sb.ToString();
+        }
+    }
+
+    Infrastructure.StockProfile BeforeProfile => Infrastructure.StockProfile.Build(BaseProgram, BaseProgram.Count, ExternalDiameter, InternalDiameter, FacingAllowance);
+
+    /// <summary>Рисуемый профиль: с настраиваемым переходом (если задан) — «после».</summary>
+    Infrastructure.StockProfile Profile
+    {
+        get
+        {
+            if (_forced is not null) return _forced;
+            if (Candidate is null) return BeforeProfile;
+            var program = BaseProgram.Append(Candidate).ToList();
+            return Infrastructure.StockProfile.Build(program, program.Count, ExternalDiameter, InternalDiameter, FacingAllowance);
+        }
+    }
+
+    /// <summary>Заливка заготовки «до» перехода — те же построители пути, но по профилю «до».</summary>
+    string RemovedFill
+    {
+        get
+        {
+            _forced = BeforeProfile;
+            try { return Valid ? ExternalPath + " " + InternalHolePath + " " + RingHolePath : string.Empty; }
+            finally { _forced = null; }
+        }
+    }
 
     double SX(double z) => z * Scale;
     double SY(double diameter) => -diameter / 2 * Scale;
@@ -191,7 +372,7 @@
     {
         get
         {
-            var segments = ClippedSorted(Profile.InternalSegments).Where(s => s.Diameter > 0).ToList();
+            var segments = ClippedSorted(Profile.EffectiveInternalSegments).Where(s => s.Diameter > 0).ToList();
             var runs = new List<List<(double FromZ, double ToZ, double Diameter)>>();
             var run = new List<(double FromZ, double ToZ, double Diameter)>();
             foreach (var s in segments)
@@ -201,6 +382,35 @@
             }
             if (run.Count > 0) runs.Add(run);
             return runs;
+        }
+    }
+
+    /// <summary>Участки отверстия для пунктирной обводки: куски, где отверстие уже наружного диаметра.
+    /// Там, где оно «зажато» наружным профилем (выход через купол/конус), обводки нет — это просто
+    /// проём, а не стенка; такой край куска считается открытым.</summary>
+    List<(List<(double FromZ, double ToZ, double Diameter)> Run, bool OpenLeft, bool OpenRight)> OutlineRuns
+    {
+        get
+        {
+            var result = new List<(List<(double, double, double)>, bool, bool)>();
+            foreach (var run in InternalRuns)
+            {
+                bool Clamped((double FromZ, double ToZ, double Diameter) s) =>
+                    s.Diameter >= Profile.ExternalDiameterAt((s.FromZ + s.ToZ) / 2) - 1e-6;
+                var piece = new List<(double FromZ, double ToZ, double Diameter)>();
+                var startedAfterClamped = false;
+                foreach (var s in run)
+                {
+                    if (Clamped(s))
+                    {
+                        if (piece.Count > 0) { result.Add((piece, startedAfterClamped, true)); piece = new(); }
+                        startedAfterClamped = true;
+                    }
+                    else piece.Add(s);
+                }
+                if (piece.Count > 0) result.Add((piece, startedAfterClamped, false));
+            }
+            return result;
         }
     }
 
@@ -262,14 +472,14 @@
             if (!Valid) return string.Empty;
             const double epsilon = 1e-6;
             var sb = new System.Text.StringBuilder();
-            foreach (var run in InternalRuns)
+            foreach (var (run, edgeOpenLeft, edgeOpenRight) in OutlineRuns)
             {
                 var top = StaircasePoints(run, mirror: false);
                 var bottom = StaircasePoints(run, mirror: true);
                 var fromZ = run[0].FromZ;
                 var toZ = run[^1].ToZ;
-                var openLeft = Profile.ExternalDiameterAt(fromZ - epsilon) <= 0;
-                var openRight = Profile.ExternalDiameterAt(toZ + epsilon) <= 0;
+                var openLeft = edgeOpenLeft || Profile.ExternalDiameterAt(fromZ - epsilon) <= 0;
+                var openRight = edgeOpenRight || Profile.ExternalDiameterAt(toZ + epsilon) <= 0;
 
                 sb.Append("M ").Append(Fmt(top[0].X)).Append(',').Append(Fmt(top[0].Y)).Append(' ');
                 for (var i = 1; i < top.Count; i++)

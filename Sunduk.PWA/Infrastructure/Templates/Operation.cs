@@ -432,7 +432,7 @@ namespace Sunduk.PWA.Infrastructure.Templates
             if (tool is null || contour is null || contour.Count < 2) return string.Empty;
             if (machine.MachineType != MachineType.Turning) return string.Empty;
             var compensated = ToolTipCompensation.Compensate(contour, tool.Radius, tool.NoseVector);
-            var body = new GCodeBuilder().Contour(compensated, feedOnFirstMove: true, feed, tool.Radius, tool.SpindleOn(speed)).ToString();
+            var body = new GCodeBuilder().Contour(compensated, feedOnFirstMove: true, feed, tool.Radius, tool.SpindleOn(speed), SafeApproachDistance, tool.NoseVector.IsExternal()).ToString();
             return new GCodeBuilder()
                 .ReferentPoint(machine, leading: true)
                 .Transition(tool, machine, coordinateSystem, coolant, body, machineTime, suppressCoolant: machine.LeadingReferentPoint)
@@ -450,7 +450,7 @@ namespace Sunduk.PWA.Infrastructure.Templates
         /// проход — <paramref name="stepOver"/>. Диалект G71 требует сверки с конкретным станком
         /// (тип I/II, единицы U/W), как и прочие циклы этой программы.
         /// </summary>
-        public static string RoughTurning(Machine machine, CoordinateSystem coordinateSystem, TurningTool tool, List<Element> contour, double stepOver, double roughStockAllow, double profStockAllow, (int, int) seqNo, int speedRough, double feedRough, Coolant coolant)
+        public static string RoughTurning(Machine machine, CoordinateSystem coordinateSystem, TurningTool tool, List<Element> contour, double stepOver, double roughStockAllow, double profStockAllow, (int, int) seqNo, int speedRough, double feedRough, Coolant coolant, double stockDiameter = 0)
         {
             if (tool is null || contour is null || contour.Count < 2 || stepOver <= 0) return string.Empty;
             if (machine.MachineType != MachineType.Turning) return string.Empty;
@@ -460,18 +460,28 @@ namespace Sunduk.PWA.Infrastructure.Templates
 
             var firstX = compensated[0].X ?? contour[0].X!.Value;
             var firstZ = compensated[0].Z ?? contour[0].Z!.Value;
+            // Точка старта цикла G71 — снаружи заготовки: по диаметру заготовки (если задан), иначе по
+            // наибольшему диаметру контура с припуском; по Z — с зазором перед торцом. Раньше старт
+            // брался по первому узлу контура и при заготовке больше него оказывался внутри металла.
+            var maxContourX = compensated.Max(e => e.X ?? 0);
+            var minContourX = compensated.Min(e => e.X ?? double.MaxValue);
+            // Расточка: старт цикла — в уже просверленном отверстии (stockDiameter — его диаметр, если
+            // задан), с зазором в сторону оси; обработка идёт от оси наружу.
             var approachX = external
-                ? firstX + 2 * roughStockAllow + 2 * SafeApproachDistance
-                : firstX - 2 * roughStockAllow - 2 * SafeApproachDistance;
+                ? (stockDiameter > 0 ? Math.Max(stockDiameter, maxContourX) : maxContourX + 2 * roughStockAllow) + 2 * SafeApproachDistance
+                : Math.Max((stockDiameter > 0 ? Math.Min(stockDiameter, minContourX) : minContourX - 2 * roughStockAllow) - 2 * SafeApproachDistance, 0);
+            // Припуск под чистовую в U цикла G71: у наружной обработки положительный, у расточки
+            // отрицательный (материал остаётся со стороны оси) — иначе чистовая сняла бы лишнее.
+            var finishAllowance = external ? profStockAllow : -profStockAllow;
 
             var profile = ProfileBlock(compensated);
 
             var builder = new GCodeBuilder()
                 .ReferentPoint(machine, leading: true)
                 .ToolCall(tool, machine, coordinateSystem, coolant, suppressCoolant: machine.LeadingReferentPoint)
-                .Line($"G0 X{approachX.NC(1)} Z{firstZ.NC()} {tool.SpindleOn(speedRough)}")
+                .Line($"G0 X{approachX.NC(1)} Z{(firstZ + SafeApproachDistance).NC()} {tool.SpindleOn(speedRough)}")
                 .Line($"G71 U{stepOver.NC()} R0.1")
-                .Line($"G71 P{seqNo.Item1} Q{seqNo.Item2} U{profStockAllow.NC()} W0. F{feedRough.NC()}");
+                .Line($"G71 P{seqNo.Item1} Q{seqNo.Item2} U{finishAllowance.NC()} W0. F{feedRough.NC()}");
             for (var i = 0; i < profile.Count; i++)
             {
                 var prefix = i == 0 ? $"N{seqNo.Item1} " : i == profile.Count - 1 ? $"N{seqNo.Item2} " : string.Empty;
@@ -505,12 +515,12 @@ namespace Sunduk.PWA.Infrastructure.Templates
                     var chord = Math.Sqrt(dx * dx + dz * dz);
                     if (arc.Radius * 2 >= chord)
                     {
-                        lines.Add($"{(arc.Direction == Sunduk.Geometry.Direction.CW ? "G2" : "G3")} X{x.Value.NC(0)} Z{z.Value.NC(0)} R{arc.Radius.NC()}");
+                        lines.Add($"{(arc.Direction == Sunduk.Geometry.Direction.CW ? "G2" : "G3")} X{x.Value.NC()} Z{z.Value.NC()} R{arc.Radius.NC()}");
                         prevX = x; prevZ = z;
                         continue;
                     }
                 }
-                lines.Add($"G1 X{x.Value.NC(0)} Z{z.Value.NC(0)}");
+                lines.Add($"G1 X{x.Value.NC()} Z{z.Value.NC()}");
                 prevX = x; prevZ = z;
             }
             return lines;

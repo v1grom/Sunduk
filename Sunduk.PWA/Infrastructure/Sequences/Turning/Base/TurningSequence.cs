@@ -27,6 +27,9 @@ namespace Sunduk.PWA.Infrastructure.Sequences.Turning.Base
         public double StepOver { get; set; }
         public double RoughStockAllow { get; set; }
         public double ProfStockAllow { get; set; }
+        /// <summary>Диаметр заготовки в этом месте программы (0 — не задан). Нужен черновому циклу,
+        /// чтобы точка старта G71 лежала снаружи заготовки, а не у первого узла контура.</summary>
+        public double StockDiameter { get; set; }
         public override MachineType MachineType => MachineType.Turning;
     }
 }

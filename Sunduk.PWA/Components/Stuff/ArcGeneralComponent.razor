@@ -223,10 +223,10 @@
     {
         if (anchor is null) return $"{label}: геометрия не сходится (проверьте радиус/скругление)";
         var kindLabel = kind == AnchorKind.Face ? "торец" : "цилиндр";
-        var text = $"{label} ({kindLabel}), с учётом пластины: X{anchor.Value.X.NC(0)} Z{anchor.Value.Z.NC()}";
+        var text = $"{label} ({kindLabel}), с учётом пластины: X{anchor.Value.X.NC()} Z{anchor.Value.Z.NC()}";
         if (round && handoff is not null)
         {
-            text += $"; сопряжение с дугой R{(blunt + InsertRadius).ToPrettyString()}: X{handoff.Value.X.NC(0)} Z{handoff.Value.Z.NC()}";
+            text += $"; сопряжение с дугой R{(blunt + InsertRadius).ToPrettyString()}: X{handoff.Value.X.NC()} Z{handoff.Value.Z.NC()}";
         }
         return text;
     }
@@ -239,7 +239,7 @@
             var end = RoundEnd ? EndHandoffPoint : EndAnchorPoint;
             if (end is null) return string.Empty;
             var g = ArcDirection is Sunduk.Geometry.Direction.CW ? "G2" : "G3";
-            return $"{g} X{end.Value.X.NC(0)} Z{end.Value.Z.NC()} R{(RadiusSize + InsertRadius).NC()}";
+            return $"{g} X{end.Value.X.NC()} Z{end.Value.Z.NC()} R{(RadiusSize + InsertRadius).NC()}";
         }
     }
 

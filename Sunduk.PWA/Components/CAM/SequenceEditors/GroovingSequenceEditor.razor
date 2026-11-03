@@ -29,7 +29,7 @@
 {
     case TurningGroovingSequences.Grooving or TurningGroovingSequences.RoughGrooving when GrooveType is CuttingType.Radial:
         <MudItem xs="12" md="4">
-            <MudSelect @bind-Value="@Tool" Variant="Variant.Text" Margin="Margin.Dense" Label="Инструмент" T="Tool">
+            <MudSelect @bind-Value="@Tool" Variant="Variant.Text" Margin="Margin.Dense" Label="Инструмент" T="Tool" ToStringFunc="@(t => t?.PickerLabel ?? string.Empty)">
                 @foreach (var tool in Tools.Where(x => x is GroovingExternalTool or GroovingInternalTool))
                 {
                     <MudSelectItem Value="@tool">@tool.PickerLabel</MudSelectItem>
@@ -39,7 +39,7 @@
         break;
     case TurningGroovingSequences.Cutting when GrooveType is CuttingType.Radial:
         <MudItem xs="12" md="4">
-            <MudSelect Value="Tool" ValueChanged="OnToolChanged" Variant="Variant.Text" Margin="Margin.Dense" Label="Инструмент" T="Tool">
+            <MudSelect Value="Tool" ValueChanged="OnToolChanged" Variant="Variant.Text" Margin="Margin.Dense" Label="Инструмент" T="Tool" ToStringFunc="@(t => t?.PickerLabel ?? string.Empty)">
                 @foreach (var tool in Tools.Where(x => x is GroovingExternalTool))
                 {
                     <MudSelectItem Value="@tool">@tool.PickerLabel</MudSelectItem>
@@ -51,7 +51,7 @@
 @if (GrooveType is CuttingType.Face)
 {
     <MudItem xs="12" md="4">
-        <MudSelect Value="Tool" ValueChanged="OnToolChanged" Variant="Variant.Text" Margin="Margin.Dense" Label="Инструмент" T="Tool">
+        <MudSelect Value="Tool" ValueChanged="OnToolChanged" Variant="Variant.Text" Margin="Margin.Dense" Label="Инструмент" T="Tool" ToStringFunc="@(t => t?.PickerLabel ?? string.Empty)">
             @foreach (var tool in Tools.Where(x => x is GroovingFaceTool))
             {
                 <MudSelectItem Value="@tool">@tool.PickerLabel</MudSelectItem>
@@ -185,6 +185,15 @@
     <MudTextField T="string" Underline="false" Label="Предпросмотр" Style="font-family: 'JetBrains Mono', monospace; font-size: medium;"
                   ReadOnly="true" Variant="Variant.Text" Text="@("\n" + ExampleText.Trim('\n'))" Lines="@(ExampleText.Trim('\n').Count(x => x == '\n') + 3)" />
 </MudItem>
+@if (Machine?.MachineType == MachineType.Turning && WorkpieceExternalDiameter > 0 && WorkpieceLength > 0)
+{
+    <MudItem xs="12" Class="mt-4">
+        <StockProfileComponent Program="Program" Candidate="@(string.IsNullOrEmpty(ExampleText) ? null : CurrentSequence)" EditSequence="SequenceToEdit"
+                               ExternalDiameter="WorkpieceExternalDiameter" InternalDiameter="WorkpieceInternalDiameter"
+                               WorkpieceLength="WorkpieceLength" FacingAllowance="WorkpieceFacingAllowance"
+                               Height="260" Label="Заготовка с учётом уже сделанного (жёлтым — что снимет этот переход)" />
+    </MudItem>
+}
 <MudItem Class="d-flex flex-row-reverse py-0 px-0 mt-4">
     <MudButton Variant="Variant.Outlined" Size="Size.Large"
                EndIcon="@Icons.Material.TwoTone.PlaylistAdd" Color="Color.Primary"
@@ -195,6 +204,10 @@
 
 @code {
     [Parameter] public Machine Machine { get; set; }
+    [Parameter] public List<Sequence> Program { get; set; }
+    [Parameter] public double WorkpieceInternalDiameter { get; set; }
+    [Parameter] public double WorkpieceLength { get; set; }
+    [Parameter] public double WorkpieceFacingAllowance { get; set; }
     [Parameter] public MachineType MachineType { get; set; }
     [Parameter] public CoordinateSystem CoordinateSystem { get; set; }
     [Parameter] public Material WorkpieceMaterial { get; set; }
@@ -326,7 +339,7 @@
         {
             case TurningCutOffSequence cutOff:
                 GroovingSequence = TurningGroovingSequences.Cutting;
-                Tool = cutOff.Tool;
+                Tool = cutOff.Tool.FindIn(Tools);
                 _CuttingExternalDiameter = cutOff.ExternalDiameter.ToPrettyString();
                 _CuttingInternalDiameter = cutOff.InternalDiameter.ToPrettyString();
                 _CuttingStepOver = cutOff.StepOver.ToPrettyString();
@@ -344,7 +357,7 @@
             case TurningExternalGroovingSequence extGroove:
                 GroovingSequence = TurningGroovingSequences.Grooving;
                 GrooveType = CuttingType.Radial;
-                Tool = extGroove.Tool;
+                Tool = extGroove.Tool.FindIn(Tools);
                 _GroovingExternalDiameter = extGroove.ExternalDiameter.ToPrettyString();
                 _GroovingInternalDiameter = extGroove.InternalDiameter.ToPrettyString();
                 _GroovingWidth = extGroove.Width.ToPrettyString();
@@ -365,7 +378,7 @@
             case TurningInternalGroovingSequence intGroove:
                 GroovingSequence = TurningGroovingSequences.Grooving;
                 GrooveType = CuttingType.Radial;
-                Tool = intGroove.Tool;
+                Tool = intGroove.Tool.FindIn(Tools);
                 _GroovingExternalDiameter = intGroove.ExternalDiameter.ToPrettyString();
                 _GroovingInternalDiameter = intGroove.InternalDiameter.ToPrettyString();
                 _GroovingWidth = intGroove.Width.ToPrettyString();
@@ -386,7 +399,7 @@
             case TurningFaceGroovingSequence faceGroove:
                 GroovingSequence = TurningGroovingSequences.Grooving;
                 GrooveType = CuttingType.Face;
-                Tool = faceGroove.Tool;
+                Tool = faceGroove.Tool.FindIn(Tools);
                 _GroovingExternalDiameter = faceGroove.ExternalDiameter.ToPrettyString();
                 _GroovingInternalDiameter = faceGroove.InternalDiameter.ToPrettyString();
                 _GroovingStartPoint = faceGroove.Width.ToPrettyString();
@@ -407,7 +420,7 @@
             case TurningExternalRoughGroovingSequence extRoughGroove:
                 GroovingSequence = TurningGroovingSequences.RoughGrooving;
                 GrooveType = CuttingType.Radial;
-                Tool = extRoughGroove.Tool;
+                Tool = extRoughGroove.Tool.FindIn(Tools);
                 _GroovingExternalDiameter = extRoughGroove.ExternalDiameter.ToPrettyString();
                 _GroovingInternalDiameter = extRoughGroove.InternalDiameter.ToPrettyString();
                 _GroovingWidth = extRoughGroove.Width.ToPrettyString();
@@ -426,7 +439,7 @@
             case TurningInternalRoughGroovingSequence intRoughGroove:
                 GroovingSequence = TurningGroovingSequences.RoughGrooving;
                 GrooveType = CuttingType.Radial;
-                Tool = intRoughGroove.Tool;
+                Tool = intRoughGroove.Tool.FindIn(Tools);
                 _GroovingExternalDiameter = intRoughGroove.ExternalDiameter.ToPrettyString();
                 _GroovingInternalDiameter = intRoughGroove.InternalDiameter.ToPrettyString();
                 _GroovingWidth = intRoughGroove.Width.ToPrettyString();
@@ -445,7 +458,7 @@
             case TurningFaceRoughGroovingSequence faceRoughGroove:
                 GroovingSequence = TurningGroovingSequences.RoughGrooving;
                 GrooveType = CuttingType.Face;
-                Tool = faceRoughGroove.Tool;
+                Tool = faceRoughGroove.Tool.FindIn(Tools);
                 _GroovingExternalDiameter = faceRoughGroove.ExternalDiameter.ToPrettyString();
                 _GroovingInternalDiameter = faceRoughGroove.InternalDiameter.ToPrettyString();
                 _GroovingStartPoint = faceRoughGroove.Width.ToPrettyString();

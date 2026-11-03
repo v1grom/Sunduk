@@ -52,6 +52,17 @@ namespace Sunduk.PWA.Infrastructure.Tools.Base
         /// (без <c>.NC()</c>) — при culture с запятой как разделителем дробной части значения
         /// вроде радиуса пластины вышли бы "0,8" вместо "0.8"; .Replace здесь — та же защёлка,
         /// что <see cref="Util.RenderTemplate"/> применяет ко всему остальному G-code-тексту.</summary>
-        public string PickerLabel => $"T{Position} ({CallDetails})".Replace(',', '.');
+        public string PickerLabel => $"T{(MachineType == MachineType.Turning ? Position.ToolNumber() : Position.ToString("D2"))} ({CallDetails})".Replace(',', '.');
+    }
+
+    public static class ToolExtensions
+    {
+        /// <summary>Инструмент из файла работы — копия, а не объект из списка станка: без подмены он не
+        /// выбран в списке и подписан именем типа. Ищем тот же инструмент в списке (вид, номер, параметры);
+        /// нет такого — возвращаем как есть.</summary>
+        public static Tool FindIn(this Tool tool, System.Collections.Generic.IEnumerable<Tool> tools)
+            => tool is null || tools is null
+                ? tool
+                : System.Linq.Enumerable.FirstOrDefault(tools, t => t.GetType() == tool.GetType() && t.Position == tool.Position && t.CallDetails == tool.CallDetails) ?? tool;
     }
 }

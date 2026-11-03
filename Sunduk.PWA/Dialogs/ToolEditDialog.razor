@@ -66,10 +66,16 @@
 
     [Parameter] public bool IsNew { get; set; }
 
-    /// <summary> Номер с нулями слева (T0101), чтобы в форме он выглядел так же, как в списке и в УП. </summary>
+    /// <summary> Номер с нулями слева (T0101), чтобы в форме он выглядел так же, как в списке и в УП.
+    /// У токарных инструментов номер всегда четырёхзначный и совпадает с номером коррекции:
+    /// 0101, 0202 … 1212. Поэтому ввод «5», «05», «505» или «0507» превращается в 0505. </summary>
     private static MudBlazor.IConverter<int, string?> PositionConverter(IntField field) => MudBlazor.Conversions.From(
         (int value) => field.Digits > 0 ? value.ToString($"D{field.Digits}") : value.ToString(),
-        text => text.GetInt(1, Util.GetNumberOption.OnlyPositive));
+        text =>
+        {
+            var value = text.GetInt(1, Util.GetNumberOption.OnlyPositive);
+            return field.Digits == 4 ? Util.TurningToolNumber(value) : value;
+        });
 
     void Save() => MudDialog.Close(DialogResult.Ok(ToolEditAction.Save));
     void Delete() => MudDialog.Close(DialogResult.Ok(ToolEditAction.Delete));
