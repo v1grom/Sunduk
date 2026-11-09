@@ -1,4 +1,5 @@
 ﻿@inject IDialogService DialogService
+@inject IJSRuntime Js
 @inject AppSettings Settings
 @inject OfflineStatusMonitor OfflineMonitor
 @inject NavigationManager Navigation
@@ -78,7 +79,7 @@
         set => _ = Settings.SetDarkAsync(value);
     }
 
-    public MudTheme CurrentTheme => AppTheme.GetTheme(IsDark, isAmber: false);
+    public MudTheme CurrentTheme => AppTheme.Get(Settings.Skin);
 
     // Набор разделов в нижней панели считается один раз при запуске: порядок не должен
     // перескакивать на глазах, иначе пропадает мышечная память.
@@ -102,6 +103,8 @@
     private void OnSettingsChanged()
     {
         UpdateBottomSections();
+        // Стили вне MudBlazor (tokens.css, шрифты, размеры) читают скин и тему из атрибутов <html>
+        _ = Js.InvokeVoidAsync("sundukAppearance.apply", Settings.Skin, Settings.IsDark);
         InvokeAsync(StateHasChanged);
     }
 
@@ -126,6 +129,7 @@
             await Settings.LoadAsync();
             await NavUsage.LoadAsync();
             UpdateBottomSections();
+            await Js.InvokeVoidAsync("sundukAppearance.apply", Settings.Skin, Settings.IsDark);
             await NavUsage.RecordAsync(Navigation.ToBaseRelativePath(Navigation.Uri));
             await Analytics.PageAsync(Navigation.ToBaseRelativePath(Navigation.Uri));
 
