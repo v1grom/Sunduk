@@ -26,6 +26,8 @@ namespace Sunduk.PWA.Infrastructure.State
         private const string CalculatorKey = "app-calculator-enabled";
         private const string ResultFormatKey = "app-result-format";
         private const string CamFormatKey = "app-cam-format";
+        /// <summary> Ключ читает и analytics.js, поэтому менять его нужно в обоих местах. </summary>
+        private const string AnalyticsKey = "app-analytics-enabled";
 
         private readonly ILocalStorageService _storage;
 
@@ -36,6 +38,9 @@ namespace Sunduk.PWA.Infrastructure.State
 
         /// <summary> Показывать ли калькулятор выражений на странице режимов. </summary>
         public bool CalculatorEnabled { get; private set; } = true;
+
+        /// <summary> Отправлять ли анонимную статистику посещений. </summary>
+        public bool AnalyticsEnabled { get; private set; } = true;
 
         /// <summary> Формат дробных чисел в результатах. Хранится шаблоном вида «0.###». </summary>
         public ResultFormat ResultFormat { get; private set; } = ResultFormat.DefaultGeneral;
@@ -55,6 +60,7 @@ namespace Sunduk.PWA.Infrastructure.State
                 IsDark = await _storage.GetItemAsync<bool?>(ThemeKey) ?? true;
                 NavOrder = await _storage.GetItemAsync<NavOrderMode?>(NavOrderKey) ?? NavOrderMode.Default;
                 CalculatorEnabled = await _storage.GetItemAsync<bool?>(CalculatorKey) ?? true;
+                AnalyticsEnabled = await _storage.GetItemAsync<bool?>(AnalyticsKey) ?? true;
                 ResultFormat = ParseFormat(await _storage.GetItemAsync<string>(ResultFormatKey), ResultFormat.DefaultGeneral);
                 CamFormat = ParseFormat(await _storage.GetItemAsync<string>(CamFormatKey), ResultFormat.DefaultCam);
             }
@@ -80,6 +86,8 @@ namespace Sunduk.PWA.Infrastructure.State
         public Task SetDarkAsync(bool value) => SetAsync(v => IsDark = v, value, ThemeKey, IsDark);
         public Task SetNavOrderAsync(NavOrderMode value) => SetAsync(v => NavOrder = v, value, NavOrderKey, NavOrder);
         public Task SetCalculatorEnabledAsync(bool value) => SetAsync(v => CalculatorEnabled = v, value, CalculatorKey, CalculatorEnabled);
+
+        public Task SetAnalyticsEnabledAsync(bool value) => SetAsync(v => AnalyticsEnabled = v, value, AnalyticsKey, AnalyticsEnabled);
 
         public Task SetResultFormatAsync(ResultFormat value) => SetFormatAsync(v => ResultFormat = v, value, ResultFormat, ResultFormatKey);
         public Task SetCamFormatAsync(ResultFormat value) => SetFormatAsync(v => CamFormat = v, value, CamFormat, CamFormatKey);

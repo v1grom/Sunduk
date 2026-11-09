@@ -3,6 +3,7 @@
 @inject OfflineStatusMonitor OfflineMonitor
 @inject NavigationManager Navigation
 @inject NavUsage NavUsage
+@inject Sunduk.PWA.Infrastructure.Analytics Analytics
 @implements IDisposable
 @inherits LayoutComponentBase
 @using MudBlazor.Services
@@ -109,6 +110,7 @@
         var relativePath = Navigation.ToBaseRelativePath(e.Location);
         UpdateFormatContext(relativePath);
         _ = NavUsage.RecordAsync(relativePath);
+        _ = Analytics.PageAsync(relativePath);
     }
 
     public void Dispose()
@@ -125,6 +127,7 @@
             await NavUsage.LoadAsync();
             UpdateBottomSections();
             await NavUsage.RecordAsync(Navigation.ToBaseRelativePath(Navigation.Uri));
+            await Analytics.PageAsync(Navigation.ToBaseRelativePath(Navigation.Uri));
 
             // Состояние офлайн-режима. Показывается строкой статуса в диалоге
             // «Описание», но следить за service worker нужно с первого рендера,

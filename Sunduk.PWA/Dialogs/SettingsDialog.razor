@@ -38,6 +38,12 @@
             </div>
 
             <div>
+                <MudText Typo="Typo.overline" Class="d-block">Статистика</MudText>
+                <MudSwitch T="bool" Value="Settings.AnalyticsEnabled" ValueChanged="@(v => Settings.SetAnalyticsEnabledAsync(v))" Color="Color.Primary" Label="Анонимная статистика посещений" />
+                <MudText Typo="Typo.caption" Class="d-block">Считает, сколько людей пользуется приложением и какими разделами. Отправляются только адрес страницы, размер экрана и случайный номер устройства, введённые значения, станки и инструменты не отправляются.</MudText>
+            </div>
+
+            <div>
                 <MudText Typo="Typo.overline" Class="d-block">Данные</MudText>
                 <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.RestartAlt" OnClick="ResetAllAsync">Сбросить всё</MudButton>
                 <MudText Typo="Typo.caption" Class="d-block">Удаляет станки и инструменты, параметры, настройки и значения калькуляторов на этом устройстве.</MudText>

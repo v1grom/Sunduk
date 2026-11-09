@@ -96,6 +96,9 @@ namespace Sunduk.PWA
             builder.Services.AddScoped<NavUsage>();
             builder.Services.AddScoped<AppSettings>();
 
+            // Scoped по той же причине: зависит от IJSRuntime.
+            builder.Services.AddScoped<Sunduk.PWA.Infrastructure.Analytics>();
+
             await builder.Build().RunAsync();
         }
     }
