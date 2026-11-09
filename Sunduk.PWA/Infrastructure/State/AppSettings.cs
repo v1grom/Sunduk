@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Blazored.LocalStorage;
+using Sunduk.PWA.Infrastructure;
 
 namespace Sunduk.PWA.Infrastructure.State
 {
@@ -22,6 +23,7 @@ namespace Sunduk.PWA.Infrastructure.State
     public class AppSettings
     {
         private const string ThemeKey = "theme-dark";
+        private const string SkinKey = "app-skin";
         private const string NavOrderKey = "app-nav-order";
         private const string CalculatorKey = "app-calculator-enabled";
         private const string ResultFormatKey = "app-result-format";
@@ -34,6 +36,8 @@ namespace Sunduk.PWA.Infrastructure.State
         public AppSettings(ILocalStorageService storage) => _storage = storage;
 
         public bool IsDark { get; private set; } = true;
+        /// <summary> Скин оформления (идентификатор из <see cref="SkinCatalog"/>). У новых и старых пользователей — sunduk. </summary>
+        public string Skin { get; private set; } = AppTheme.DefaultSkin;
         public NavOrderMode NavOrder { get; private set; } = NavOrderMode.Default;
 
         /// <summary> Показывать ли калькулятор выражений на странице режимов. </summary>
@@ -58,6 +62,7 @@ namespace Sunduk.PWA.Infrastructure.State
             try
             {
                 IsDark = await _storage.GetItemAsync<bool?>(ThemeKey) ?? true;
+                Skin = AppTheme.Normalize(await _storage.GetItemAsync<string>(SkinKey));
                 NavOrder = await _storage.GetItemAsync<NavOrderMode?>(NavOrderKey) ?? NavOrderMode.Default;
                 CalculatorEnabled = await _storage.GetItemAsync<bool?>(CalculatorKey) ?? true;
                 AnalyticsEnabled = await _storage.GetItemAsync<bool?>(AnalyticsKey) ?? true;
@@ -84,6 +89,7 @@ namespace Sunduk.PWA.Infrastructure.State
         }
 
         public Task SetDarkAsync(bool value) => SetAsync(v => IsDark = v, value, ThemeKey, IsDark);
+        public Task SetSkinAsync(string value) => SetAsync(v => Skin = v, AppTheme.Normalize(value), SkinKey, Skin);
         public Task SetNavOrderAsync(NavOrderMode value) => SetAsync(v => NavOrder = v, value, NavOrderKey, NavOrder);
         public Task SetCalculatorEnabledAsync(bool value) => SetAsync(v => CalculatorEnabled = v, value, CalculatorKey, CalculatorEnabled);
 

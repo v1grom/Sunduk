@@ -1,0 +1,75 @@
+@using System.Collections.Concurrent
+@using System.Text
+@using System.Text.RegularExpressions
+@inject HttpClient Http
+@inject AppSettings Settings
+@implements IDisposable
+
+@* SVG-рисунки в проекте нарисованы с зашитыми цветами (#ff5722 и #bfbfbf). В <img> стили страницы не действуют,
+   поэтому цвета подменяются на токены текущего скина и темы в самом тексте SVG, а в <img> уходит data-URI.
+   Результат кэшируется по (файл, скин, тема): переключение палитры не ходит в сеть второй раз. *@
+@if (_src is not null)
+{
+    <img src="@_src" width="@Width" height="@Height" alt="@Alt" />
+}
+
+@code {
+    [Parameter, EditorRequired] public string Src { get; set; } = string.Empty;
+    [Parameter] public object? Width { get; set; }
+    [Parameter] public object? Height { get; set; }
+    [Parameter] public string? Alt { get; set; }
+
+    private static readonly ConcurrentDictionary<string, string> Raw = new();
+    private static readonly ConcurrentDictionary<(string Src, string Skin, bool Dark), string> Themed = new();
+
+    private string? _src;
+    private (string Src, string Skin, bool Dark)? _loaded;
+
+    protected override void OnInitialized() => Settings.Changed += OnSettingsChanged;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private void OnSettingsChanged() => _ = InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    private async Task LoadAsync()
+    {
+        var key = (Src, Settings.Skin, Settings.IsDark);
+        if (_loaded == key) return;
+
+        if (!Themed.TryGetValue(key, out var uri))
+        {
+            try
+            {
+                if (!Raw.TryGetValue(Src, out var svg))
+                    Raw[Src] = svg = await Http.GetStringAsync(Src);
+                uri = ToDataUri(Recolor(svg, SkinCatalog.Get(Settings.Skin, Settings.IsDark)));
+                Themed[key] = uri;
+            }
+            catch (HttpRequestException)
+            {
+                // Нет сети и файла нет в кэше: рисунок просто не показывается, остальная страница работает
+                return;
+            }
+        }
+        _src = uri;
+        _loaded = key;
+    }
+
+    /// <summary> Линии и подписи рисунков (#bfbfbf) — вторичный цвет текста темы, акцентные элементы (#ff5722) — акцент скина. </summary>
+    internal static string Recolor(string svg, SkinTokens tokens)
+    {
+        svg = Regex.Replace(svg, "#bfbfbf", tokens.Text2, RegexOptions.IgnoreCase);
+        // QR-код перекрашивается только акцентом (угловые метки и знак): тёмные модули и белое поле остаются
+        // как есть, от их контраста зависит сканирование.
+        return Regex.Replace(svg, "#ff5722", tokens.Accent, RegexOptions.IgnoreCase);
+    }
+
+    private static string ToDataUri(string svg) =>
+        "data:image/svg+xml;base64," + Convert.ToBase64String(Encoding.UTF8.GetBytes(svg));
+
+    public void Dispose() => Settings.Changed -= OnSettingsChanged;
+}

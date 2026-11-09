@@ -8,6 +8,13 @@
             <div>
                 <MudText Typo="Typo.overline" Class="d-block">Внешний вид</MudText>
                 <MudSwitch T="bool" Value="Settings.IsDark" ValueChanged="@(v => Settings.SetDarkAsync(v))" Color="Color.Primary" Label="Тёмная тема" />
+                <MudSelect T="string" Label="Палитра" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           Value="Settings.Skin" ValueChanged="@(v => Settings.SetSkinAsync(v))">
+                    @foreach (var skin in SkinCatalog.Names)
+                    {
+                        <MudSelectItem T="string" Value="@skin">@AppTheme.Title(skin)</MudSelectItem>
+                    }
+                </MudSelect>
             </div>
 
             <div>
