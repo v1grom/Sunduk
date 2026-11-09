@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using MudBlazor;
 using Sunduk.PWA.Infrastructure.Sequences;
+using Sunduk.PWA.Infrastructure.State;
 using Sunduk.PWA.Infrastructure.Sequences.Base;
 using Sunduk.Geometry.ContourElements;
 using Sunduk.Geometry.ContourElements.Base;
@@ -80,16 +81,15 @@ namespace Sunduk.PWA.Infrastructure
         /// Форматирует число в строку подходящую для СЧПУ
         /// </summary>
         /// <param name="value">Число</param>
-        /// <param name="precision">Точность</param>
+        /// <param name="precision">Знаков после точки; без значения — по параметрам приложения</param>
         /// <param name="option">Опция плавающей точки</param>
         /// <returns>Отформатированную строку</returns>
-        public static string NC(this double value, int precision = 3, NcDecimalPointOption option = NcDecimalPointOption.With)
+        public static string NC(this double value, int? precision = null, NcDecimalPointOption option = NcDecimalPointOption.With)
         {
-            string result = value.ToString($"F{precision}", CultureInfo.InvariantCulture).Contains('.')
-                ? value.ToString($"F{precision}", CultureInfo.InvariantCulture).TrimEnd('0')
-                : value.ToString($"F{precision}");
-            return option == NcDecimalPointOption.With 
-                ? result.Contains('.') ? result : result + '.' 
+            // Хвостовые нули и число знаков по умолчанию берутся из параметров приложения
+            string result = ResultFormats.Active.Format(value, precision);
+            return option == NcDecimalPointOption.With
+                ? result.Contains('.') ? result : result + '.'
                 : result.TrimEnd('.');
         }
 
@@ -188,6 +188,20 @@ namespace Sunduk.PWA.Infrastructure
         public static string ToolNumber(this int value)
         {
             return value.ToString($"D4");
+        }
+
+        /// <summary>
+        /// Приводит введённое значение к номеру токарного инструмента: четыре цифры, номер
+        /// инструмента и номер коррекции одинаковые (0101, 0202 … 1212). Одно-двузначный ввод —
+        /// это сам номер («5» → 0505), трёх-четырёхзначный — берётся номер инструмента из старших
+        /// разрядов («507» → 0505, «0507» → 0505). Ноль и отрицательные числа дают 0101.
+        /// </summary>
+        public static int TurningToolNumber(int value)
+        {
+            if (value <= 0) return 101;
+            var tool = value >= 100 ? value / 100 : value;
+            tool = Math.Clamp(tool, 1, 99);
+            return tool * 101;
         }
 
         /// <summary>
@@ -385,14 +399,12 @@ namespace Sunduk.PWA.Infrastructure
         /// Форматирует число в такую строку, какую хочу я
         /// </summary>
         /// <param name="value">Число</param>
-        /// <param name="precision">Точность</param>
+        /// <param name="precision">Знаков после точки; без значения — по параметрам приложения</param>
         /// <returns>Строку содержащую число</returns>
-        public static string ToPrettyString(this double value, int precision = 3, PrettyStringOption stringOption = PrettyStringOption.ZeroToEmpty)
+        public static string ToPrettyString(this double value, int? precision = null, PrettyStringOption stringOption = PrettyStringOption.ZeroToEmpty)
         {
             if (value == 0 && stringOption == PrettyStringOption.ZeroToEmpty) return string.Empty;
-            string result = value.ToString($"F{precision}").Replace(",", ".");
-            if (result.Contains('.')) return result.TrimEnd('0').TrimEnd('.');
-            return result;
+            return ResultFormats.Active.Format(value, precision);
         }
 
 

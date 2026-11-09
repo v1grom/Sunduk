@@ -29,6 +29,15 @@ namespace Sunduk.Geometry
     /// модели контура задать нельзя (не хватает поля на Arc) — ограничение редактора контура, а не
     /// этого модуля.
     /// <br/><br/>
+    /// <b>Основной расчёт стыков — точное пересечение смещённых кривых</b> (<see cref="ExactArcCorner"/>):
+    /// траектория центра пластины — контур, сдвинутый в воздух на радиус пластины (прямая переносится
+    /// параллельно, дуга меняет радиус на ±r), мнимая вершина = центр − (r, r). Работает для любого
+    /// сочетания прямая/дуга/мнимый торец и заменяет приближения по касательной, которые точны только
+    /// в самом узле и давали сотые доли мм ошибки или не тот корень пересечения. Описанные ниже
+    /// формулы остаются запасными ветками — на случай, когда смещённые кривые не пересеклись.
+    /// Проверяется независимо (ContourCompensationTests): центр пластины ни на одном участке не
+    /// подходит к номинальному контуру ближе r.
+    /// <br/><br/>
     /// <b>Стык прямая-прямая под углом</b> (один выровненный по оси сосед + наклонная кромка, или
     /// обе кромки наклонные — единая модель для обоих случаев): каждая кромка, включая мнимый
     /// торец перед первым узлом контура, сдвигается вдоль своей собственной нормали
@@ -98,21 +107,40 @@ namespace Sunduk.Geometry
         // истинный радиус вместо диаметра — вся геометрия ниже считается в этих координатах.
         // ------------------------------------------------------------------
 
+        /// <summary>Переводит узлы в радиусы и подставляет пропущенные X/Z предыдущими (как это делает
+        /// G-код). Центр каждой дуги вычисляется здесь же по её концам, радиусу и направлению — храниться
+        /// в узле он не обязан (редактор заполняет его только по кнопке «Рассчитать», а после правки
+        /// координат он устаревает). Дуга, которую G-код всё равно нарисует прямой (радиус меньше
+        /// половины хорды), становится линией.</summary>
         private static List<Element> ToRadiusNodes(List<Element> contour)
         {
             var result = new List<Element>(contour.Count);
+            double? prevX = null;
+            double? prevZ = null;
             foreach (var e in contour)
             {
-                var r = e.X / 2;
+                var x = (e.X ?? prevX * 2) / 2;
+                var z = e.Z ?? prevZ;
                 result.Add(e switch
                 {
-                    Point p => new Point(r, p.Z, p.Blunt),
-                    Line l => new Line(r, l.Z, l.Angle, l.Blunt, l.BluntType),
-                    Arc a => new Arc(r, a.Z, a.Radius, a.Direction, a.CenterX / 2, a.CenterZ),
+                    Point p => new Point(x, z, p.Blunt),
+                    Line l => new Line(x, z, l.Angle, l.Blunt, l.BluntType),
+                    Arc a => RadiusArc(a, prevX, prevZ, x, z),
                     _ => e,
                 });
+                prevX = x;
+                prevZ = z;
             }
             return result;
+        }
+
+        private static Element RadiusArc(Arc arc, double? prevX, double? prevZ, double? x, double? z)
+        {
+            if (x is null || z is null || prevX is null || prevZ is null) return new Arc(x, z, arc.Radius, arc.Direction, arc.CenterX / 2, arc.CenterZ);
+            var center = ArcConstructions.ArcCenter(prevX.Value, prevZ.Value, x.Value, z.Value, arc.Radius, arc.Direction);
+            return center is null
+                ? new Line(x, z)
+                : new Arc(x, z, arc.Radius, arc.Direction, center.Value.X, center.Value.Z);
         }
 
         private static List<Element> ToDiameterElements(List<Element> nodes)
@@ -207,6 +235,22 @@ namespace Sunduk.Geometry
 
                 if (hasExplicitBlunt) { result.Add(curr); continue; } // line-line blunt — обработает BluntSuffix
 
+                // Любой стык (прямая-прямая, прямая-дуга, дуга-дуга): точное пересечение смещённых
+                // кривых (см. ExactArcCorner). Последний узел компенсируется, если в него приходит
+                // дуга или наклонная прямая: конец цилиндра/торца — это мнимая вершина без поправки.
+                // Старые приближённые ветки ниже остаются запасными — на случай, если смещённые
+                // кривые не пересеклись.
+                var incomingSlanted = i > 0 && !incomingIsArc && !IsAxisAligned(nodes[i - 1], curr);
+                if (next is not null || incomingIsArc || incomingSlanted)
+                {
+                    var exact = ExactArcCorner(nodes, i, toolRadius, external);
+                    if (exact is not null)
+                    {
+                        result.Add(CompensateNode(curr, exact.Value.X, exact.Value.Z));
+                        continue;
+                    }
+                }
+
                 if (next is null) { result.Add(curr); continue; } // последний узел — стыка после него нет
 
                 var outgoingAligned = IsAxisAligned(curr, next);
@@ -298,6 +342,130 @@ namespace Sunduk.Geometry
             }
 
             return (result, finalizedArcs);
+        }
+
+        // ------------------------------------------------------------------
+        // Точный стык с дугой: траектория ЦЕНТРА пластины — смещённый контур (прямая сдвигается на
+        // r в сторону воздуха, дуга меняет радиус на ±r), а мнимая вершина = центр − (r, r) для
+        // наружного точения (центр + (r, −r) для внутреннего). Угол стыка берётся как пересечение
+        // двух смещённых элементов, ближайшее к «идеальной» точке — узлу, сдвинутому на r по
+        // средней нормали воздуха. Так не нужны ни тригонометрия по углу касательной (она точна
+        // только в самом узле, а не вдоль смещённой дуги), ни выбор корня «на глаз».
+        // ------------------------------------------------------------------
+
+        private readonly record struct OffsetSegment(GeoLine? Line, GeoCircle? Circle, GPoint NormalAtStart, GPoint NormalAtEnd);
+
+        /// <summary>Единичная нормаль к направлению, смотрящая в воздух: у наружного точения — в +X, у
+        /// внутреннего — в −X; у строго вертикальной (торец) — в +Z.</summary>
+        private static GPoint AirNormal(double dx, double dz, bool external)
+        {
+            var nx = dz;
+            var nz = -dx;
+            var len = Math.Sqrt(nx * nx + nz * nz);
+            nx /= len;
+            nz /= len;
+            var sign = external ? 1 : -1;
+            var flip = Math.Abs(nx) > Tolerance ? sign * nx < 0 : nz < 0;
+            return flip ? new GPoint(-nx, -nz) : new GPoint(nx, nz);
+        }
+
+        /// <summary>Смещённый на r элемент, пришедший в узел <paramref name="to"/> из <paramref name="from"/>.
+        /// null — элемент вырожденный или радиус вогнутой дуги не больше радиуса пластины.</summary>
+        private static OffsetSegment? OffsetOf(Element from, Element to, double r, bool external)
+        {
+            var (x1, z1, x2, z2) = (from.X!.Value, from.Z!.Value, to.X!.Value, to.Z!.Value);
+            if (to is Arc arc)
+            {
+                var convex = IsConvexToTool(arc, external);
+                var offsetRadius = convex ? arc.Radius + r : arc.Radius - r;
+                if (offsetRadius <= Tolerance || arc.Radius <= Tolerance) return null;
+                GPoint Outward(double x, double z)
+                {
+                    var ux = (x - arc.CenterX) / arc.Radius;
+                    var uz = (z - arc.CenterZ) / arc.Radius;
+                    return convex ? new GPoint(ux, uz) : new GPoint(-ux, -uz);
+                }
+                return new OffsetSegment(null, new GeoCircle(arc.CenterX, arc.CenterZ, offsetRadius), Outward(x1, z1), Outward(x2, z2));
+            }
+
+            var dx = x2 - x1;
+            var dz = z2 - z1;
+            var length = Math.Sqrt(dx * dx + dz * dz);
+            if (length < Tolerance) return null;
+            var n = AirNormal(dx, dz, external);
+            return new OffsetSegment(new GeoLine(x1 + r * n.X, z1 + r * n.Z, dx / length, dz / length), null, n, n);
+        }
+
+        /// <summary>Координаты мнимой вершины на узле <paramref name="i"/>, у которого входящий или
+        /// исходящий элемент — дуга. Перед первым узлом — мнимый торец (вертикаль, воздух со стороны +Z),
+        /// после последнего — продолжение входящего элемента (угла там нет).</summary>
+        private static GPoint? ExactArcCorner(List<Element> nodes, int i, double r, bool external)
+        {
+            var node = nodes[i];
+            var next = i + 1 < nodes.Count ? nodes[i + 1] : null;
+            if (next is not null && (next.X is null || next.Z is null)) return null;
+
+            OffsetSegment? incoming;
+            if (i == 0)
+            {
+                var face = new GPoint(0, 1);
+                incoming = new OffsetSegment(new GeoLine(node.X!.Value, node.Z!.Value + r, 1, 0), null, face, face);
+            }
+            else
+            {
+                if (nodes[i - 1].X is null || nodes[i - 1].Z is null) return null;
+                incoming = OffsetOf(nodes[i - 1], node, r, external);
+            }
+            if (incoming is null) return null;
+
+            var nIn = incoming.Value.NormalAtEnd;
+            var ideal = new GPoint(node.X!.Value + r * nIn.X, node.Z!.Value + r * nIn.Z);
+            GPoint? center;
+            if (next is null)
+            {
+                center = ideal;
+            }
+            else
+            {
+                var outgoing = OffsetOf(node, next, r, external);
+                if (outgoing is null) return null;
+                var nOut = outgoing.Value.NormalAtStart;
+                var sx = nIn.X + nOut.X;
+                var sz = nIn.Z + nOut.Z;
+                var sl = Math.Sqrt(sx * sx + sz * sz);
+                if (sl > Tolerance) ideal = new GPoint(node.X!.Value + r * sx / sl, node.Z!.Value + r * sz / sl);
+                center = Nearest(Intersections(incoming.Value, outgoing.Value), ideal);
+                // Смещённые кривые могут не пересечься. У двух дуг (почти касающиеся вогнутые дуги,
+                // у которых пластина «не достаёт» до общего угла) берём идеальную точку; в остальных
+                // случаях (торец/прямая с дугой на выпуклом углу) возвращаем null — стык досчитают
+                // запасные ветки ниже, они в этих случаях не срезают деталь.
+                if (center is null && incoming.Value.Circle is not null && outgoing.Value.Circle is not null) center = ideal;
+            }
+            if (center is null) return null;
+            return external
+                ? new GPoint(center.Value.X - r, center.Value.Z - r)
+                : new GPoint(center.Value.X + r, center.Value.Z - r);
+        }
+
+        private static IReadOnlyList<(double X, double Z)> Intersections(OffsetSegment a, OffsetSegment b)
+        {
+            if (a.Line is { } la && b.Line is { } lb)
+                return ArcConstructions.IntersectLines(la, lb) is { } p ? new[] { p } : Array.Empty<(double, double)>();
+            if (a.Line is { } l1 && b.Circle is { } c1) return ArcConstructions.IntersectLineCircle(l1, c1).Points;
+            if (a.Circle is { } c2 && b.Line is { } l2) return ArcConstructions.IntersectLineCircle(l2, c2).Points;
+            return ArcConstructions.IntersectCircles(a.Circle!.Value, b.Circle!.Value).Points;
+        }
+
+        private static GPoint? Nearest(IReadOnlyList<(double X, double Z)> points, GPoint target)
+        {
+            GPoint? best = null;
+            var bestDistance = double.MaxValue;
+            foreach (var (x, z) in points)
+            {
+                var d = (x - target.X) * (x - target.X) + (z - target.Z) * (z - target.Z);
+                if (d < bestDistance) { bestDistance = d; best = new GPoint(x, z); }
+            }
+            return best;
         }
 
         private static bool IsFaceDirection(GDirection d) => Math.Abs(d.Z) < Tolerance;

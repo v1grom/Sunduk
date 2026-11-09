@@ -1,0 +1,698 @@
+@using Sunduk.Geometry
+@inject ArcAdvancedState State
+<MudGrid Spacing="1" Class="pa-2">
+    <MudItem xs="12" sm="6">
+        <MudField Label="Построение" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudSelect T="Mode" @bind-Value="CurrentMode" Variant="Variant.Text" Margin="Margin.Dense" Dense="true">
+                <MudSelectItem T="Mode" Value="Mode.ArcArc">Дуга × дуга (пересечение)</MudSelectItem>
+                <MudSelectItem T="Mode" Value="Mode.ArcLine">Дуга × линия (пересечение)</MudSelectItem>
+                <MudSelectItem T="Mode" Value="Mode.PointTangent">Касательная из точки к дуге</MudSelectItem>
+                <MudSelectItem T="Mode" Value="Mode.CommonTangent">Общая касательная двух дуг</MudSelectItem>
+                <MudSelectItem T="Mode" Value="Mode.Fillet">Сопряжение дугой радиуса R</MudSelectItem>
+            </MudSelect>
+        </MudField>
+
+        @switch (CurrentMode)
+        {
+            case Mode.ArcArc:
+            case Mode.CommonTangent:
+                @ArcFields("Дуга А", State.ArcA, ColorA)
+                @ArcFields("Дуга Б", State.ArcB, ColorB)
+                break;
+            case Mode.ArcLine:
+                @ArcFields("Дуга", State.ArcA, ColorA)
+                @LineFields("Линия", State.LineA, ColorB)
+                break;
+            case Mode.PointTangent:
+                @PointFields()
+                @ArcFields("Дуга", State.ArcA, ColorA)
+                break;
+            case Mode.Fillet:
+                <MudField Label="Радиус сопрягающей дуги" Variant="Variant.Filled" Underline="false" Class="mt-2">
+                    <MudTextField Class="monofield" @bind-Value="State.FilletRadius" T="string" Label="R" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                </MudField>
+                @ElementFields("Элемент А", State.FilletKindA, k => State.FilletKindA = k, State.ArcA, State.LineA, ColorA)
+                @ElementFields("Элемент Б", State.FilletKindB, k => State.FilletKindB = k, State.ArcB, State.LineB, ColorB)
+                break;
+        }
+    </MudItem>
+
+    @{
+        var calc = Compute();
+    }
+    <MudItem xs="12" sm="6">
+        <MudPaper Outlined="true" Class="mt-1">
+            @if (calc.Valid && calc.Items.Count > 0)
+            {
+                <MudSwitch T="bool" @bind-Value="State.ZoomResult" Label="Увеличить выбранный результат" Color="Color.Primary" Class="ml-2"/>
+            }
+            <div style="text-align: center;">
+                <svg height="260" width="100%" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 @ViewW @ViewH" preserveAspectRatio="xMidYMid meet">
+                    @* Оси в углу: ориентация чертежа (X вверх, Z вправо, как в ArcGeneral) *@
+                    <g stroke="#666" stroke-width="1" fill="none">
+                        <path d="M 14,@Fmt(ViewH - 14) L 14,@Fmt(ViewH - 44) M 14,@Fmt(ViewH - 14) L 44,@Fmt(ViewH - 14)"/>
+                    </g>
+                    <text x="18" y="@Fmt(ViewH - 40)" fill="#666" style="font-family: 'JetBrains Mono', monospace;" font-size="9">X+</text>
+                    <text x="@Fmt(40)" y="@Fmt(ViewH - 18)" fill="#666" style="font-family: 'JetBrains Mono', monospace;" font-size="9">Z+</text>
+
+                    @if (calc.Valid)
+                    {
+                        @if (calc.OriginVisible)
+                        {
+                            <path stroke="#666" stroke-width="1" fill="none"
+                                  d="M @Fmt(calc.Sx(0) - 8),@Fmt(calc.Sy(0)) L @Fmt(calc.Sx(0) + 8),@Fmt(calc.Sy(0)) M @Fmt(calc.Sx(0)),@Fmt(calc.Sy(0) - 8) L @Fmt(calc.Sx(0)),@Fmt(calc.Sy(0) + 8)"/>
+                        }
+                        @foreach (var l in calc.Lines)
+                        {
+                            var (x1, y1, x2, y2) = calc.LineEnds(l.L);
+                            <line x1="@Fmt(x1)" y1="@Fmt(y1)" x2="@Fmt(x2)" y2="@Fmt(y2)" stroke="@l.Color" stroke-width="1" stroke-dasharray="3,3"/>
+                            <g><text x="@Fmt(calc.Sx(l.L.Z) + 5)" y="@Fmt(calc.Sy(l.L.X) - 5)" fill="@l.Color" style="font-family: 'JetBrains Mono', monospace;" font-size="10">@l.Label</text></g>
+                        }
+                        @foreach (var c in calc.Circles)
+                        {
+                            var cx = calc.Sx(c.C.Z);
+                            var cy = calc.Sy(c.C.X);
+                            <circle cx="@Fmt(cx)" cy="@Fmt(cy)" r="@Fmt(c.C.R * calc.Scale)" stroke="@c.Color" stroke-width="1" stroke-dasharray="3,3" fill="none"/>
+                            <path stroke="@c.Color" stroke-width="1" fill="none" d="M @Fmt(cx - 3),@Fmt(cy) L @Fmt(cx + 3),@Fmt(cy) M @Fmt(cx),@Fmt(cy - 3) L @Fmt(cx),@Fmt(cy + 3)"/>
+                            <g><text x="@Fmt(cx + 5)" y="@Fmt(cy - 5)" fill="@c.Color" style="font-family: 'JetBrains Mono', monospace;" font-size="10">@c.Label</text></g>
+                        }
+                        @foreach (var a in calc.Anchors)
+                        {
+                            <circle cx="@Fmt(calc.Sx(a.Z))" cy="@Fmt(calc.Sy(a.X))" r="3" fill="@a.Color"/>
+                            <g><text x="@Fmt(calc.Sx(a.Z) + 5)" y="@Fmt(calc.Sy(a.X) - 5)" fill="@a.Color" style="font-family: 'JetBrains Mono', monospace;" font-size="10">@a.Label</text></g>
+                        }
+                        @foreach (var i in calc.DrawOrder)
+                        {
+                            var sel = i == calc.Selected;
+                            var item = calc.Items[i];
+                            var opacity = sel ? "1" : "0.35";
+                            <g opacity="@opacity">
+                                @if (sel && item.Circle is { } rc)
+                                {
+                                    <circle cx="@Fmt(calc.Sx(rc.Z))" cy="@Fmt(calc.Sy(rc.X))" r="@Fmt(rc.R * calc.Scale)" stroke="@ColorResult" stroke-width="1" stroke-dasharray="2,4" fill="none"/>
+                                }
+                                @foreach (var g in sel ? item.Guides : [])
+                                {
+                                    <line x1="@Fmt(calc.Sx(g.Z1))" y1="@Fmt(calc.Sy(g.X1))" x2="@Fmt(calc.Sx(g.Z2))" y2="@Fmt(calc.Sy(g.X2))" stroke="@ColorCorner" stroke-width="1.5" stroke-dasharray="4,3"/>
+                                }
+                                @foreach (var r in sel ? item.Radials : [])
+                                {
+                                    <line x1="@Fmt(calc.Sx(r.Z1))" y1="@Fmt(calc.Sy(r.X1))" x2="@Fmt(calc.Sx(r.Z2))" y2="@Fmt(calc.Sy(r.X2))" stroke="#aaa" stroke-width="1"/>
+                                }
+                                @foreach (var s in item.Segments)
+                                {
+                                    <line x1="@Fmt(calc.Sx(s.Z1))" y1="@Fmt(calc.Sy(s.X1))" x2="@Fmt(calc.Sx(s.Z2))" y2="@Fmt(calc.Sy(s.X2))" stroke="var(--mud-palette-primary)" stroke-width="2"/>
+                                }
+                                @if (item.Arc is { } arc)
+                                {
+                                    <path stroke="var(--mud-palette-primary)" stroke-width="3.5" stroke-linecap="round" fill="none" d="@calc.ArcPath(arc)"/>
+                                }
+                                @foreach (var lb in sel ? item.Labels : [])
+                                {
+                                    <g><text x="@Fmt(calc.Sx(lb.Z) + 6)" y="@Fmt(calc.Sy(lb.X) + 12)" fill="@lb.Color" style="font-family: 'JetBrains Mono', monospace;" font-size="10" font-weight="bold">@lb.Label</text></g>
+                                }
+                                @foreach (var p in sel ? item.Points : [])
+                                {
+                                    <circle cx="@Fmt(calc.Sx(p.Z))" cy="@Fmt(calc.Sy(p.X))" r="3" fill="@p.Color"/>
+                                    <g><text x="@Fmt(calc.Sx(p.Z) + 5)" y="@Fmt(calc.Sy(p.X) - 5)" fill="@p.Color" style="font-family: 'JetBrains Mono', monospace;" font-size="10">@p.Label</text></g>
+                                }
+                            </g>
+                        }
+                    }
+                </svg>
+            </div>
+        </MudPaper>
+
+        <MudField Label="Результат" Variant="Variant.Filled" Underline="false" Class="mt-2">
+            @if (!calc.Valid)
+            {
+                <MudText Typo="Typo.body2">@calc.Message</MudText>
+            }
+            else
+            {
+                <MudGrid Spacing="1">
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2" Color="@(calc.Items.Count == 0 ? Color.Warning : Color.Default)">@calc.Message</MudText>
+                    </MudItem>
+                    @for (var i = 0; i < calc.Items.Count; i++)
+                    {
+                        var index = i;
+                        var item = calc.Items[i];
+                        var sel = i == calc.Selected;
+                        <MudItem xs="12">
+                            <div @onclick="() => State.Selected = index"
+                                 style="cursor: pointer; border-left: 4px solid @(sel ? "var(--mud-palette-primary)" : "transparent"); padding: 2px 8px; background: @(sel ? "var(--mud-palette-action-default-hover)" : "transparent");">
+                                <MudText Typo="Typo.body2"><b>@item.Title</b></MudText>
+                                @foreach (var line in item.Lines)
+                                {
+                                    <MudText Typo="Typo.body2" Style="font-family: 'JetBrains Mono', monospace;">@line</MudText>
+                                }
+                            </div>
+                        </MudItem>
+                    }
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">X — диаметр, как в программе. Прямые считаются бесконечными; углы — к оси Z, положительные в сторону +X. Для траектории центра пластины радиус дуги меняется на величину радиуса пластины.</MudText>
+                    </MudItem>
+                </MudGrid>
+            }
+        </MudField>
+    </MudItem>
+</MudGrid>
+
+@code
+{
+    const double ViewW = 400;
+    const double ViewH = 260;
+    const double ViewMargin = 30;
+
+    const string ColorA = "#2196F3";
+    const string ColorB = "#FF9800";
+    const string ColorResult = "#4CAF50";
+    /// <summary>Вершина без скругления (пересечение исходных элементов).</summary>
+    const string ColorCorner = "#FFC107";
+
+    public enum Mode { ArcArc, ArcLine, PointTangent, CommonTangent, Fillet }
+    public enum LineKind { Face, Cylinder, Angle, TwoPoints }
+    public enum ElementKind { Arc, Line }
+
+    Mode CurrentMode
+    {
+        get => State.Mode;
+        set { State.Mode = value; State.Selected = 0; }
+    }
+
+    static string Fmt(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    static string F(double v) => v.ToPrettyString(stringOption: Util.PrettyStringOption.AsIs);
+    static double Num(string s) => s.GetDouble(0, Util.GetNumberOption.Any);
+    static double Pos(string s) => s.GetDouble();
+
+    // ------------------------------------------------------------------ поля ввода
+
+    RenderFragment ArcFields(string label, ArcAdvancedArcInput a, string color) =>
+        @<MudField Label="@label" Variant="Variant.Filled" Underline="false" Class="mt-2" Style="@($"border-left: 4px solid {color};")">
+            <MudGrid Spacing="0">
+                <MudItem xs="6">
+                    <MudTextField Class="monofield" @bind-Value="a.CenterX" T="string" Label="Центр, X" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField Class="monofield" @bind-Value="a.CenterZ" T="string" Label="Центр, Z" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Class="monofield" @bind-Value="a.Radius" T="string" Label="Радиус дуги" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                </MudItem>
+            </MudGrid>
+        </MudField>;
+
+    RenderFragment LineFields(string label, ArcAdvancedLineInput l, string color) =>
+        @<MudField Label="@label" Variant="Variant.Filled" Underline="false" Class="mt-2" Style="@($"border-left: 4px solid {color};")">
+            <MudGrid Spacing="0">
+                <MudItem xs="12">
+                    <MudSelect T="LineKind" @bind-Value="l.Kind" Label="Способ задания" Variant="Variant.Text" Margin="Margin.Dense" Dense="true">
+                        <MudSelectItem T="LineKind" Value="LineKind.Face">Торец (Z)</MudSelectItem>
+                        <MudSelectItem T="LineKind" Value="LineKind.Cylinder">Цилиндр (диаметр)</MudSelectItem>
+                        <MudSelectItem T="LineKind" Value="LineKind.Angle">Точка и угол</MudSelectItem>
+                        <MudSelectItem T="LineKind" Value="LineKind.TwoPoints">Две точки</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                @switch (l.Kind)
+                {
+                    case LineKind.Face:
+                        <MudItem xs="12">
+                            <MudTextField Class="monofield" @bind-Value="l.FaceZ" T="string" Label="Z торца" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                        </MudItem>
+                        break;
+                    case LineKind.Cylinder:
+                        <MudItem xs="12">
+                            <MudTextField Class="monofield" @bind-Value="l.Diameter" T="string" Label="Диаметр" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                        </MudItem>
+                        break;
+                    case LineKind.Angle:
+                        <MudItem xs="6">
+                            <MudTextField Class="monofield" @bind-Value="l.X1" T="string" Label="Точка, X" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField Class="monofield" @bind-Value="l.Z1" T="string" Label="Точка, Z" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField Class="monofield" @bind-Value="l.Angle" T="string" Label="Угол к оси Z" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="°" Immediate="true" Margin="Margin.Dense"/>
+                        </MudItem>
+                        break;
+                    case LineKind.TwoPoints:
+                        <MudItem xs="6">
+                            <MudTextField Class="monofield" @bind-Value="l.X1" T="string" Label="Точка 1, X" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField Class="monofield" @bind-Value="l.Z1" T="string" Label="Точка 1, Z" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField Class="monofield" @bind-Value="l.X2" T="string" Label="Точка 2, X" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudTextField Class="monofield" @bind-Value="l.Z2" T="string" Label="Точка 2, Z" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                        </MudItem>
+                        break;
+                }
+            </MudGrid>
+        </MudField>;
+
+    RenderFragment PointFields() =>
+        @<MudField Label="Точка" Variant="Variant.Filled" Underline="false" Class="mt-2" Style="@($"border-left: 4px solid {ColorB};")">
+            <MudGrid Spacing="0">
+                <MudItem xs="6">
+                    <MudTextField Class="monofield" @bind-Value="State.PointX" T="string" Label="X" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField Class="monofield" @bind-Value="State.PointZ" T="string" Label="Z" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"/>
+                </MudItem>
+            </MudGrid>
+        </MudField>;
+
+    /// <summary>Элемент сопряжения: дуга или линия на выбор.</summary>
+    RenderFragment ElementFields(string label, ElementKind kind, Action<ElementKind> setKind, ArcAdvancedArcInput arc, ArcAdvancedLineInput line, string color) =>
+        @<div>
+            <MudRadioGroup T="ElementKind" Value="kind" ValueChanged="setKind" Class="mt-1 d-flex justify-center">
+                <MudRadio Value="ElementKind.Arc" Color="Color.Primary">@(label + ": дуга")</MudRadio>
+                <MudRadio Value="ElementKind.Line" Color="Color.Primary">@(label + ": линия")</MudRadio>
+            </MudRadioGroup>
+            @if (kind == ElementKind.Arc)
+            {
+                @ArcFields(label, arc, color)
+            }
+            else
+            {
+                @LineFields(label, line, color)
+            }
+        </div>;
+
+    // ------------------------------------------------------------------ расчёт
+
+    sealed record Seg(double X1, double Z1, double X2, double Z2);
+    sealed record Marker(double X, double Z, string Label, string Color);
+    sealed record SceneCircle(GeoCircle C, string Color, string Label);
+    sealed record SceneLine(GeoLine L, string Color, string Label);
+    /// <summary>Дуга сопряжения: центр, радиус, концы (X — радиус).</summary>
+    sealed record ArcSpec(double Cx, double Cz, double R, double X1, double Z1, double X2, double Z2);
+
+    sealed class Item
+    {
+        public string Title { get; init; } = string.Empty;
+        public List<string> Lines { get; } = [];
+        public List<Marker> Points { get; } = [];
+        public List<Seg> Segments { get; } = [];
+        public List<Seg> Radials { get; } = [];
+        /// <summary>Пунктирные направляющие (продолжение элементов до вершины без скругления).</summary>
+        public List<Seg> Guides { get; } = [];
+        public ArcSpec? Arc { get; set; }
+        /// <summary>Полная окружность результата (рисуется тонким пунктиром).</summary>
+        public GeoCircle? Circle { get; set; }
+        /// <summary>Подписи размеров (текст без маркера).</summary>
+        public List<Marker> Labels { get; } = [];
+        /// <summary>Точки, на которые наводится масштаб «увеличить результат». null — все точки и отрезки.</summary>
+        public List<(double X, double Z)>? Focus { get; set; }
+    }
+
+    sealed class Calc
+    {
+        public bool Valid { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public int Selected { get; set; }
+        public List<SceneCircle> Circles { get; } = [];
+        public List<SceneLine> Lines { get; } = [];
+        public List<Marker> Anchors { get; } = [];
+        public List<Item> Items { get; } = [];
+
+        /// <summary>Минимальный охват (мм) при увеличении результата — чтобы мелкий результат не растягивался до бесконечности.</summary>
+        public double ZoomMinSpan { get; set; } = 2;
+
+        public IEnumerable<int> DrawOrder =>
+            Enumerable.Range(0, Items.Count).Where(i => i != Selected).Concat(Selected >= 0 ? [Selected] : []);
+
+        // Преобразование «мир (X радиус, Z) → экран»: Z вправо, X вверх.
+        public double Scale { get; private set; } = 1;
+        double _cx, _cz, _minX, _maxX, _minZ, _maxZ;
+        public double Sx(double z) => ViewW / 2 + (z - _cz) * Scale;
+        public double Sy(double x) => ViewH / 2 - (x - _cx) * Scale;
+        public bool OriginVisible => _minX <= 0 && _maxX >= 0 && _minZ <= 0 && _maxZ >= 0;
+
+        public void Fit(bool zoom)
+        {
+            var xs = new List<double>();
+            var zs = new List<double>();
+            void Add(double x, double z) { xs.Add(x); zs.Add(z); }
+
+            if (zoom && Selected >= 0)
+            {
+                var item = Items[Selected];
+                if (item.Focus is { } focus) foreach (var f in focus) Add(f.X, f.Z);
+                else
+                {
+                    foreach (var p in item.Points) Add(p.X, p.Z);
+                    foreach (var sg in item.Segments) { Add(sg.X1, sg.Z1); Add(sg.X2, sg.Z2); }
+                }
+                FinishFit(ZoomMinSpan, 14);
+                return;
+            }
+
+            foreach (var c in Circles)
+            {
+                Add(c.C.X - c.C.R, c.C.Z - c.C.R);
+                Add(c.C.X + c.C.R, c.C.Z + c.C.R);
+            }
+            foreach (var l in Lines) Add(l.L.X, l.L.Z);
+            foreach (var a in Anchors) Add(a.X, a.Z);
+            foreach (var item in Items)
+            {
+                foreach (var p in item.Points) Add(p.X, p.Z);
+                foreach (var s in item.Segments) { Add(s.X1, s.Z1); Add(s.X2, s.Z2); }
+                if (item.Arc is { } arc)
+                {
+                    Add(arc.Cx, arc.Cz);
+                    Add(arc.X1, arc.Z1);
+                    Add(arc.X2, arc.Z2);
+                }
+            }
+            if (xs.Count == 0) { Add(-10, -10); Add(10, 10); }
+            FinishFit(1e-3, ViewMargin);
+
+            void FinishFit(double minSpan, double margin)
+            {
+                _minX = xs.Min(); _maxX = xs.Max(); _minZ = zs.Min(); _maxZ = zs.Max();
+                _cx = (_minX + _maxX) / 2;
+                _cz = (_minZ + _maxZ) / 2;
+                var w = Math.Max(_maxZ - _minZ, minSpan);
+                var h = Math.Max(_maxX - _minX, minSpan);
+                Scale = Math.Min((ViewW - 2 * margin) / w, (ViewH - 2 * margin) / h);
+            }
+        }
+
+        /// <summary>Концы бесконечной прямой на экране: за пределами окна (обрезает сам svg).</summary>
+        public (double X1, double Y1, double X2, double Y2) LineEnds(GeoLine l)
+        {
+            var len = 5 * Math.Max(Math.Max(_maxX - _minX, _maxZ - _minZ), 1) ;
+            return (Sx(l.Z - l.DZ * len), Sy(l.X - l.DX * len), Sx(l.Z + l.DZ * len), Sy(l.X + l.DX * len));
+        }
+
+        /// <summary>Малая дуга между точками касания (путь svg в экранных координатах).</summary>
+        public string ArcPath(ArcSpec a)
+        {
+            var x1 = Sx(a.Z1); var y1 = Sy(a.X1);
+            var x2 = Sx(a.Z2); var y2 = Sy(a.X2);
+            var cx = Sx(a.Cz); var cy = Sy(a.Cx);
+            var cross = (x1 - cx) * (y2 - cy) - (y1 - cy) * (x2 - cx);
+            var sweep = cross > 0 ? 1 : 0;
+            var r = Fmt(a.R * Scale);
+            return $"M {Fmt(x1)},{Fmt(y1)} A {r},{r} 0 0 {sweep} {Fmt(x2)},{Fmt(y2)}";
+        }
+    }
+
+    static string Pt((double X, double Z) p) => $"X{F(p.X * 2)} Z{F(p.Z)}";
+    static double Dist((double X, double Z) a, (double X, double Z) b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Z - b.Z) * (a.Z - b.Z));
+
+    /// <summary>Угол прямой к оси Z в градусах, приведённый к (−90°, 90°].</summary>
+    static double LineAngle(double dx, double dz)
+    {
+        var a = Math.Atan2(dx, dz).Degrees();
+        if (a > 90) a -= 180;
+        if (a <= -90) a += 180;
+        return a;
+    }
+
+    GeoCircle? ToCircle(ArcAdvancedArcInput a) => Pos(a.Radius) > 0 ? new GeoCircle(Num(a.CenterX) / 2, Num(a.CenterZ), Pos(a.Radius)) : null;
+
+    GeoLine? ToLine(ArcAdvancedLineInput l) => l.Kind switch
+    {
+        LineKind.Face => new GeoLine(0, Num(l.FaceZ), 1, 0),
+        LineKind.Cylinder => new GeoLine(Num(l.Diameter) / 2, 0, 0, 1),
+        LineKind.Angle => GeoLine.FromAngle(Num(l.X1) / 2, Num(l.Z1), Num(l.Angle)),
+        _ => GeoLine.FromPoints(Num(l.X1) / 2, Num(l.Z1), Num(l.X2) / 2, Num(l.Z2))
+    };
+
+    Calc Compute()
+    {
+        var calc = new Calc();
+        switch (CurrentMode)
+        {
+            case Mode.ArcArc: ComputeArcArc(calc); break;
+            case Mode.ArcLine: ComputeArcLine(calc); break;
+            case Mode.PointTangent: ComputePointTangent(calc); break;
+            case Mode.CommonTangent: ComputeCommonTangent(calc); break;
+            case Mode.Fillet: ComputeFillet(calc); break;
+        }
+        if (calc.Valid)
+        {
+            calc.Selected = calc.Items.Count == 0 ? -1 : Math.Clamp(State.Selected, 0, calc.Items.Count - 1);
+            calc.Fit(State.ZoomResult);
+        }
+        return calc;
+    }
+
+    void AddCircle(Calc calc, GeoCircle c, string color, string label) => calc.Circles.Add(new(c, color, $"{label} R{F(c.R)}"));
+
+    void AddLine(Calc calc, GeoLine l, string color, string label)
+    {
+        calc.Lines.Add(new(l, color, label));
+        calc.Anchors.Add(new(l.X, l.Z, string.Empty, color));
+    }
+
+    static string CircleRelationText(CircleRelation r) => r switch
+    {
+        CircleRelation.Intersecting => "Дуги пересекаются в двух точках",
+        CircleRelation.ExternalTangent => "Дуги касаются снаружи",
+        CircleRelation.InternalTangent => "Дуги касаются изнутри",
+        CircleRelation.Separate => "Окружности не пересекаются: лежат отдельно",
+        CircleRelation.Nested => "Окружности не пересекаются: одна внутри другой",
+        _ => "Окружности совпадают — пересечений бесконечно много"
+    };
+
+    void ComputeArcArc(Calc calc)
+    {
+        if (ToCircle(State.ArcA) is not { } a || ToCircle(State.ArcB) is not { } b)
+        {
+            calc.Message = "Заполните радиусы обеих дуг";
+            return;
+        }
+        calc.Valid = true;
+        AddCircle(calc, a, ColorA, "А");
+        AddCircle(calc, b, ColorB, "Б");
+
+        var res = ArcConstructions.IntersectCircles(a, b);
+        calc.Message = $"{CircleRelationText(res.Relation)}. Расстояние между центрами: {F(res.CenterDistance)} мм";
+        for (var i = 0; i < res.Points.Count; i++)
+        {
+            var p = res.Points[i];
+            var item = new Item { Title = res.Points.Count == 1 ? "Точка касания" : $"Точка {i + 1}" };
+            item.Lines.Add(Pt(p));
+            item.Points.Add(new(p.X, p.Z, $"P{i + 1}", ColorResult));
+            calc.Items.Add(item);
+        }
+        if (res.Points.Count == 2)
+        {
+            calc.Message += $". Расстояние между точками: {F(Dist(res.Points[0], res.Points[1]))} мм";
+        }
+    }
+
+    void ComputeArcLine(Calc calc)
+    {
+        if (ToCircle(State.ArcA) is not { } c)
+        {
+            calc.Message = "Заполните радиус дуги";
+            return;
+        }
+        if (ToLine(State.LineA) is not { } l)
+        {
+            calc.Message = "Две точки линии совпадают";
+            return;
+        }
+        calc.Valid = true;
+        AddCircle(calc, c, ColorA, "А");
+        AddLine(calc, l, ColorB, "Л");
+
+        var res = ArcConstructions.IntersectLineCircle(l, c);
+        calc.Message = res.Relation switch
+        {
+            LineCircleRelation.Secant => "Линия пересекает дугу в двух точках",
+            LineCircleRelation.Tangent => "Линия касается дуги",
+            _ => "Линия не пересекает окружность"
+        } + $". Расстояние от центра до линии: {F(res.Distance)} мм (радиус {F(c.R)} мм)";
+
+        for (var i = 0; i < res.Points.Count; i++)
+        {
+            var p = res.Points[i];
+            var item = new Item { Title = res.Points.Count == 1 ? "Точка касания" : $"Точка {i + 1}" };
+            item.Lines.Add(Pt(p));
+            item.Points.Add(new(p.X, p.Z, $"P{i + 1}", ColorResult));
+            calc.Items.Add(item);
+        }
+    }
+
+    void ComputePointTangent(Calc calc)
+    {
+        if (ToCircle(State.ArcA) is not { } c)
+        {
+            calc.Message = "Заполните радиус дуги";
+            return;
+        }
+        calc.Valid = true;
+        var px = Num(State.PointX) / 2;
+        var pz = Num(State.PointZ);
+        AddCircle(calc, c, ColorA, "А");
+        calc.Anchors.Add(new(px, pz, "Т", ColorB));
+
+        var res = ArcConstructions.TangentsFromPoint(px, pz, c);
+        var d = Dist((px, pz), (c.X, c.Z));
+        calc.Message = res.Count switch
+        {
+            0 => $"Точка внутри окружности (расстояние до центра {F(d)} мм, радиус {F(c.R)} мм) — касательных нет",
+            1 => "Точка лежит на окружности — касательная одна",
+            _ => $"Две касательные. Расстояние от точки до центра: {F(d)} мм"
+        };
+        for (var i = 0; i < res.Count; i++)
+        {
+            var t = res[i];
+            var item = new Item { Title = res.Count == 1 ? "Касательная" : $"Касательная {i + 1}" };
+            item.Lines.Add($"Касание: {Pt(t.Touch)}");
+            item.Lines.Add($"Длина: {F(t.Length)} мм, угол к Z: {F(LineAngle(t.Touch.X - px, t.Touch.Z - pz))}°");
+            item.Points.Add(new(t.Touch.X, t.Touch.Z, $"T{i + 1}", ColorResult));
+            item.Segments.Add(new(px, pz, t.Touch.X, t.Touch.Z));
+            item.Labels.Add(new((px + t.Touch.X) / 2, (pz + t.Touch.Z) / 2, $"L{F(t.Length)}", ColorResult));
+            item.Radials.Add(new(c.X, c.Z, t.Touch.X, t.Touch.Z));
+            calc.Items.Add(item);
+        }
+    }
+
+    void ComputeCommonTangent(Calc calc)
+    {
+        if (ToCircle(State.ArcA) is not { } a || ToCircle(State.ArcB) is not { } b)
+        {
+            calc.Message = "Заполните радиусы обеих дуг";
+            return;
+        }
+        calc.Valid = true;
+        AddCircle(calc, a, ColorA, "А");
+        AddCircle(calc, b, ColorB, "Б");
+
+        var res = ArcConstructions.CommonTangents(a, b);
+        var ext = 0;
+        var inn = 0;
+        calc.Message = res.Count == 0
+            ? "Общих касательных нет: дуги соосны или одна внутри другой"
+            : $"Общих касательных: {res.Count}. Расстояние между центрами: {F(Dist((a.X, a.Z), (b.X, b.Z)))} мм";
+        for (var i = 0; i < res.Count; i++)
+        {
+            var t = res[i];
+            var internalKind = t.Kind == CommonTangentKind.Internal;
+            var n = internalKind ? ++inn : ++ext;
+            var item = new Item { Title = $"{(internalKind ? "Внутренняя" : "Внешняя")} {n}" };
+            item.Lines.Add($"Касание А: {Pt(t.Touch1)}");
+            item.Lines.Add($"Касание Б: {Pt(t.Touch2)}");
+            item.Lines.Add($"Длина: {F(Dist(t.Touch1, t.Touch2))} мм, угол к Z: {F(LineAngle(t.Touch2.X - t.Touch1.X, t.Touch2.Z - t.Touch1.Z))}°");
+            item.Points.Add(new(t.Touch1.X, t.Touch1.Z, $"T{i + 1}", ColorResult));
+            item.Points.Add(new(t.Touch2.X, t.Touch2.Z, $"T{i + 1}'", ColorResult));
+            item.Segments.Add(new(t.Touch1.X, t.Touch1.Z, t.Touch2.X, t.Touch2.Z));
+            item.Labels.Add(new((t.Touch1.X + t.Touch2.X) / 2, (t.Touch1.Z + t.Touch2.Z) / 2, $"L{F(Dist(t.Touch1, t.Touch2))}", ColorResult));
+            item.Radials.Add(new(a.X, a.Z, t.Touch1.X, t.Touch1.Z));
+            item.Radials.Add(new(b.X, b.Z, t.Touch2.X, t.Touch2.Z));
+            calc.Items.Add(item);
+        }
+    }
+
+    static string ContactText(ContactKind k) => k switch
+    {
+        ContactKind.Line => "касается линии",
+        ContactKind.Outside => "снаружи дуги",
+        ContactKind.Encloses => "охватывает дугу",
+        _ => "внутри дуги"
+    };
+
+    void ComputeFillet(Calc calc)
+    {
+        var r = Pos(State.FilletRadius);
+        if (r <= 0)
+        {
+            calc.Message = "Заполните радиус сопрягающей дуги";
+            return;
+        }
+
+        var ka = State.FilletKindA;
+        var kb = State.FilletKindB;
+        GeoCircle? ca = ka == ElementKind.Arc ? ToCircle(State.ArcA) : null;
+        GeoCircle? cb = kb == ElementKind.Arc ? ToCircle(State.ArcB) : null;
+        GeoLine? la = ka == ElementKind.Line ? ToLine(State.LineA) : null;
+        GeoLine? lb = kb == ElementKind.Line ? ToLine(State.LineB) : null;
+
+        if ((ka == ElementKind.Arc && ca is null) || (kb == ElementKind.Arc && cb is null))
+        {
+            calc.Message = "Заполните радиусы дуг";
+            return;
+        }
+        if ((ka == ElementKind.Line && la is null) || (kb == ElementKind.Line && lb is null))
+        {
+            calc.Message = "Две точки линии совпадают";
+            return;
+        }
+        calc.Valid = true;
+
+        if (ca is { } c1) AddCircle(calc, c1, ColorA, "А");
+        if (cb is { } c2) AddCircle(calc, c2, ColorB, "Б");
+        if (la is { } l1) AddLine(calc, l1, ColorA, "А");
+        if (lb is { } l2) AddLine(calc, l2, ColorB, "Б");
+
+        IReadOnlyList<TangentCircle> res = (ka, kb) switch
+        {
+            (ElementKind.Arc, ElementKind.Arc) => ArcConstructions.FilletCircleCircle(ca!.Value, cb!.Value, r),
+            (ElementKind.Arc, ElementKind.Line) => ArcConstructions.FilletCircleLine(ca!.Value, lb!.Value, r),
+            (ElementKind.Line, ElementKind.Arc) => ArcConstructions.FilletCircleLine(cb!.Value, la!.Value, r)
+                .Select(t => t with { Touch1 = t.Touch2, Touch2 = t.Touch1, Contact1 = t.Contact2, Contact2 = t.Contact1 }).ToList(),
+            _ => ArcConstructions.FilletLineLine(la!.Value, lb!.Value, r)
+        };
+
+        calc.Message = res.Count == 0
+            ? "Дугу такого радиуса вписать нельзя: проверьте радиус и взаимное положение элементов"
+            : $"Вариантов сопряжения радиусом {F(r)} мм: {res.Count}. Выберите нужный — он подсвечен на чертеже";
+
+        calc.ZoomMinSpan = 2.5 * r;
+
+        for (var i = 0; i < res.Count; i++)
+        {
+            var t = res[i];
+            var item = new Item { Title = $"Сопряжение {i + 1}: А {ContactText(t.Contact1)}, Б {ContactText(t.Contact2)}" };
+            item.Lines.Add($"Центр: {Pt(t.Center)}");
+            item.Lines.Add($"Касание А: {Pt(t.Touch1)}");
+            item.Lines.Add($"Касание Б: {Pt(t.Touch2)}");
+            item.Points.Add(new(t.Center.X, t.Center.Z, $"O{i + 1}", ColorResult));
+            item.Points.Add(new(t.Touch1.X, t.Touch1.Z, $"T{i + 1}", ColorResult));
+            item.Points.Add(new(t.Touch2.X, t.Touch2.Z, $"T{i + 1}'", ColorResult));
+            item.Radials.Add(new(t.Center.X, t.Center.Z, t.Touch1.X, t.Touch1.Z));
+            item.Radials.Add(new(t.Center.X, t.Center.Z, t.Touch2.X, t.Touch2.Z));
+            item.Arc = new(t.Center.X, t.Center.Z, t.R, t.Touch1.X, t.Touch1.Z, t.Touch2.X, t.Touch2.Z);
+            item.Circle = new GeoCircle(t.Center.X, t.Center.Z, t.R);
+
+            // Середина малой дуги: на ней подпись радиуса и на неё наводится увеличение.
+            var mx = (t.Touch1.X + t.Touch2.X) / 2;
+            var mz = (t.Touch1.Z + t.Touch2.Z) / 2;
+            var md = Dist((mx, mz), t.Center);
+            (double X, double Z) mid = md < 1e-9 ? (mx, mz) : (t.Center.X + (mx - t.Center.X) / md * t.R, t.Center.Z + (mz - t.Center.Z) / md * t.R);
+            item.Labels.Add(new(mid.X, mid.Z, $"R{F(t.R)}", ColorResult));
+            item.Focus = [t.Touch1, t.Touch2, mid];
+
+            // Вершина без скругления: пересечение исходных элементов, ближайшее к сопряжению.
+            IReadOnlyList<(double X, double Z)> corners = (ka, kb) switch
+            {
+                (ElementKind.Arc, ElementKind.Arc) => ArcConstructions.IntersectCircles(ca!.Value, cb!.Value).Points,
+                (ElementKind.Arc, ElementKind.Line) => ArcConstructions.IntersectLineCircle(lb!.Value, ca!.Value).Points,
+                (ElementKind.Line, ElementKind.Arc) => ArcConstructions.IntersectLineCircle(la!.Value, cb!.Value).Points,
+                _ => ArcConstructions.IntersectLines(la!.Value, lb!.Value) is { } v ? [v] : []
+            };
+            if (corners.Count > 0)
+            {
+                var v = corners.OrderBy(c => Dist(c, t.Center)).First();
+                item.Lines.Insert(0, $"Вершина без скругления: {Pt(v)}");
+                item.Points.Add(new(v.X, v.Z, "V", ColorCorner));
+                item.Guides.Add(new(v.X, v.Z, t.Touch1.X, t.Touch1.Z));
+                item.Guides.Add(new(v.X, v.Z, t.Touch2.X, t.Touch2.Z));
+                item.Focus.Add(v);
+            }
+            calc.Items.Add(item);
+        }
+    }
+}

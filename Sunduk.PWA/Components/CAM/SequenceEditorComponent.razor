@@ -1,11 +1,11 @@
-<MudGrid Spacing="1">
+<MudGrid Spacing="1" Class="seq-flow">
     <MudItem xs="12" md="4">
-        <MudSelect Label="Тип" T="SequenceType" Variant="Variant.Filled" Margin="Margin.Dense" Value="@Type" ValueChanged="OnSequenceChanged" Disabled="@(Sequence is not null)">
+        <MudSelect Label="Тип" T="SequenceType" Variant="Variant.Text" Margin="Margin.Dense" Value="@Type" ValueChanged="OnSequenceChanged" Disabled="@(Sequence is not null)">
             <MudSelectItem Value="@SequenceType.General">Общие</MudSelectItem>
             @if (MachineType == MachineType.Turning)
             {
                 <MudSelectItem Value="@SequenceType.Facing">Обработка торца</MudSelectItem>
-                <MudSelectItem Value="@SequenceType.ExternalTurning">Наружное точение</MudSelectItem>
+                <MudSelectItem Value="@SequenceType.ExternalTurning">Точение по контуру (наружное и расточка)</MudSelectItem>
                 <MudSelectItem Value="@SequenceType.Grooving">Обработка канавок и отрезка</MudSelectItem>
                 <MudSelectItem Value="@SequenceType.Burnishing">Накатка</MudSelectItem>
             }
@@ -18,32 +18,34 @@
     {
         case SequenceType.General:
             <GeneralSequenceEditor Machine="Machine" MachineType="MachineType" CoordinateSystem="CoordinateSystem" SafePlane="SafePlane"
-                                    WorkpieceExternalDiameter="WorkpieceExternalDiameter" Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit" />
+                                    WorkpieceExternalDiameter="WorkpieceExternalDiameter" Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit"  Program="Program" WorkpieceInternalDiameter="WorkpieceInternalDiameter" WorkpieceLength="WorkpieceLength" WorkpieceFacingAllowance="WorkpieceFacingAllowance" />
             break;
         case SequenceType.Facing:
             <FacingSequenceEditor Machine="Machine" MachineType="MachineType" CoordinateSystem="CoordinateSystem" WorkpieceMaterial="WorkpieceMaterial"
                                    WorkpieceExternalDiameter="WorkpieceExternalDiameter" WorkpieceInternalDiameter="WorkpieceInternalDiameter"
                                    WorkpieceCurrentInternalDiameter="WorkpieceCurrentInternalDiameter" CyclesCount="CyclesCount"
-                                   Tools="Tools" Program="Program" SequenceToEdit="Sequence" OnSubmit="Submit" />
+                                   Tools="Tools" Program="Program" SequenceToEdit="Sequence" OnSubmit="Submit"  WorkpieceLength="WorkpieceLength" WorkpieceFacingAllowance="WorkpieceFacingAllowance" />
             break;
         case SequenceType.ExternalTurning:
             <ExternalTurningSequenceEditor Machine="Machine" MachineType="MachineType" CoordinateSystem="CoordinateSystem" WorkpieceMaterial="WorkpieceMaterial"
-                                            Tools="Tools" CyclesCount="CyclesCount" SequenceToEdit="Sequence" OnSubmit="Submit" />
+                                            Tools="Tools" CyclesCount="CyclesCount" SequenceToEdit="Sequence" OnSubmit="Submit"
+                                            Program="Program" WorkpieceExternalDiameter="WorkpieceExternalDiameter" WorkpieceInternalDiameter="WorkpieceInternalDiameter"
+                                            WorkpieceLength="WorkpieceLength" WorkpieceFacingAllowance="WorkpieceFacingAllowance" />
             break;
         case SequenceType.Drilling:
             <DrillingSequenceEditor Machine="Machine" MachineType="MachineType" WorkpieceMaterial="WorkpieceMaterial" CoordinateSystem="CoordinateSystem"
-                                     SafePlane="SafePlane" Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit" />
+                                     SafePlane="SafePlane" Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit"  Program="Program" WorkpieceExternalDiameter="WorkpieceExternalDiameter" WorkpieceInternalDiameter="WorkpieceInternalDiameter" WorkpieceLength="WorkpieceLength" WorkpieceFacingAllowance="WorkpieceFacingAllowance" />
             break;
         case SequenceType.Threading:
             <ThreadingSequenceEditor Machine="Machine" MachineType="MachineType" CoordinateSystem="CoordinateSystem" SafePlane="SafePlane"
-                                      Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit" />
+                                      Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit"  Program="Program" WorkpieceExternalDiameter="WorkpieceExternalDiameter" WorkpieceInternalDiameter="WorkpieceInternalDiameter" WorkpieceLength="WorkpieceLength" WorkpieceFacingAllowance="WorkpieceFacingAllowance" />
             break;
         case SequenceType.Grooving:
             <GroovingSequenceEditor Machine="Machine" MachineType="MachineType" CoordinateSystem="CoordinateSystem" WorkpieceMaterial="WorkpieceMaterial"
-                                     WorkpieceExternalDiameter="WorkpieceExternalDiameter" Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit" />
+                                     WorkpieceExternalDiameter="WorkpieceExternalDiameter" Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit"  Program="Program" WorkpieceInternalDiameter="WorkpieceInternalDiameter" WorkpieceLength="WorkpieceLength" WorkpieceFacingAllowance="WorkpieceFacingAllowance" />
             break;
         case SequenceType.Burnishing:
-            <BurnishingSequenceEditor Machine="Machine" CoordinateSystem="CoordinateSystem" Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit" />
+            <BurnishingSequenceEditor Machine="Machine" CoordinateSystem="CoordinateSystem" Tools="Tools" SequenceToEdit="Sequence" OnSubmit="Submit"  Program="Program" WorkpieceExternalDiameter="WorkpieceExternalDiameter" WorkpieceInternalDiameter="WorkpieceInternalDiameter" WorkpieceLength="WorkpieceLength" WorkpieceFacingAllowance="WorkpieceFacingAllowance" />
             break;
     }
 </MudGrid>
@@ -79,6 +81,9 @@
 
     [Parameter]
     public double WorkpieceInternalDiameter { get; set; }
+
+    [Parameter]
+    public double WorkpieceFacingAllowance { get; set; }
 
     [Parameter]
     public double WorkpieceCurrentInternalDiameter { get; set; }

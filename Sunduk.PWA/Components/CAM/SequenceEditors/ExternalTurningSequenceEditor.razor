@@ -1,12 +1,12 @@
 <MudItem xs="12" md="4">
-    <MudSelect Label="Переход" T="TurningSequences" Variant="Variant.Filled" Margin="Margin.Dense" @bind-Value="TurningSequence">
+    <MudSelect Label="Переход" T="TurningSequences" Variant="Variant.Text" Margin="Margin.Dense" @bind-Value="TurningSequence">
         <MudSelectItem Value="@(TurningSequences.RoughTurning)">Черновое точение</MudSelectItem>
         <MudSelectItem Value="@(TurningSequences.FinishTurning)">Чистовое точение</MudSelectItem>
     </MudSelect>
 </MudItem>
 <MudItem xs="12" md="4">
-    <MudSelect Value="Tool" ValueChanged="OnToolChanged" Variant="Variant.Filled" Margin="Margin.Dense" Label="Инструмент" T="Tool">
-        @foreach (var tool in Tools.Where(x => x is TurningExternalTool && (x as TurningExternalTool).Type == TurningExternalTool.Types.Bar))
+    <MudSelect Value="Tool" ValueChanged="OnToolChanged" Variant="Variant.Text" Margin="Margin.Dense" Label="Инструмент" T="Tool" ToStringFunc="@(t => t?.PickerLabel ?? string.Empty)">
+        @foreach (var tool in Tools.Where(x => x is TurningInternalTool || (x is TurningExternalTool e && e.Type == TurningExternalTool.Types.Bar)))
         {
             <MudSelectItem Value="@tool">@tool.PickerLabel</MudSelectItem>
         }
@@ -15,7 +15,7 @@
 @if (Machine.CoordinateSystems.Count > 1)
 {
     <MudItem xs="12" md="4">
-        <MudSelect Label="Система координат" T="CoordinateSystem" Variant="Variant.Filled" Margin="Margin.Dense" @bind-Value="SelectedCoordinateSystem">
+        <MudSelect Label="Система координат" T="CoordinateSystem" Variant="Variant.Text" Margin="Margin.Dense" @bind-Value="SelectedCoordinateSystem">
             @foreach (var cs in Machine.CoordinateSystems)
             {
                 <MudSelectItem Value="@cs" />
@@ -24,7 +24,7 @@
     </MudItem>
 }
 <MudItem xs="12" md="4">
-    <MudSelect Label="Тип охлаждения" T="Coolant" Variant="Variant.Filled" Margin="Margin.Dense" @bind-Value="SelectedCoolant">
+    <MudSelect Label="Тип охлаждения" T="Coolant" Variant="Variant.Text" Margin="Margin.Dense" @bind-Value="SelectedCoolant">
         <MudSelectItem Value="@(Coolant.General)">Обычный</MudSelectItem>
         <MudSelectItem Value="@(Coolant.Through)">Через шпиндель</MudSelectItem>
         <MudSelectItem Value="@(Coolant.Full)">Вся подача СОЖ</MudSelectItem>
@@ -33,38 +33,38 @@
     </MudSelect>
 </MudItem>
 <MudItem xs="12" md="4">
-    <MudTextField Label="Съем" @bind-Value="_FacingStepOver" Variant="Variant.Filled" Margin="Margin.Dense" Immediate="true" />
+    <MudTextField Label="Съем" @bind-Value="_FacingStepOver" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
 </MudItem>
 <MudItem xs="12" md="4">
-    <MudTextField Label="Черный припуск" @bind-Value="_FacingRoughStockAllow" Variant="Variant.Filled" Margin="Margin.Dense" Immediate="true" />
+    <MudTextField Label="Черный припуск" @bind-Value="_FacingRoughStockAllow" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
 </MudItem>
 <MudItem xs="12" md="4">
-    <MudTextField Label="Чистовой припуск" @bind-Value="_FacingProfStockAllow" Variant="Variant.Filled" Margin="Margin.Dense" Immediate="true" />
+    <MudTextField Label="Чистовой припуск" @bind-Value="_FacingProfStockAllow" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
 </MudItem>
 @if (TurningSequence is TurningSequences.RoughTurning)
 {
-    <MudItem xs="6" md="6">
-        <MudTextField Label="Черновая Vc" @bind-Value="SpeedRough" Variant="Variant.Filled" Margin="Margin.Dense" Immediate="true" />
+    <MudItem xs="12" md="4">
+        <MudTextField Label="Черновая Vc" @bind-Value="SpeedRough" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
     </MudItem>
-    <MudItem xs="6" md="6">
-        <MudTextField Label="Черновая F" @bind-Value="_FeedRough" Variant="Variant.Filled" Margin="Margin.Dense" Immediate="true" />
+    <MudItem xs="12" md="4">
+        <MudTextField Label="Черновая F" @bind-Value="_FeedRough" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
     </MudItem>
 }
 else
 {
-    <MudItem xs="6" md="6">
-        <MudTextField Label="Чистовая Vc" @bind-Value="SpeedFinish" Variant="Variant.Filled" Margin="Margin.Dense" Immediate="true" />
+    <MudItem xs="12" md="4">
+        <MudTextField Label="Чистовая Vc" @bind-Value="SpeedFinish" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
     </MudItem>
-    <MudItem xs="6" md="6">
-        <MudTextField Label="Чистовая F" @bind-Value="_FeedFinish" Variant="Variant.Filled" Margin="Margin.Dense" Immediate="true" />
+    <MudItem xs="12" md="4">
+        <MudTextField Label="Чистовая F" @bind-Value="_FeedFinish" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
     </MudItem>
 }
 <MudItem xs="12">
-    <ContourComponent @bind-Contour="Contour"></ContourComponent>
+    <ContourComponent @bind-Contour="Contour" External="@(Tool is not TurningInternalTool)" Stock="StockBefore" StockLength="WorkpieceLength" FacingAllowance="WorkpieceFacingAllowance"></ContourComponent>
 </MudItem>
 <MudItem Class="mt-4" xs="12" sm="12" md="12">
     <MudTextField T="string" Underline="false" Label="Предпросмотр" Style="font-family: 'JetBrains Mono', monospace; font-size: medium;"
-                  ReadOnly="true" Variant="Variant.Filled" Text="@("\n" + ExampleText.Trim('\n'))" Lines="@(ExampleText.Trim('\n').Count(x => x == '\n') + 3)" />
+                  ReadOnly="true" Variant="Variant.Text" Text="@("\n" + ExampleText.Trim('\n'))" Lines="@(ExampleText.Trim('\n').Count(x => x == '\n') + 3)" />
 </MudItem>
 <MudItem Class="d-flex flex-row-reverse py-0 px-0 mt-4">
     <MudButton Variant="Variant.Outlined" Size="Size.Large"
@@ -82,9 +82,28 @@ else
     [Parameter] public List<Tool> Tools { get; set; }
     [Parameter] public int CyclesCount { get; set; }
     [Parameter] public Sequence SequenceToEdit { get; set; }
+    [Parameter] public List<Sequence> Program { get; set; }
+    [Parameter] public double WorkpieceExternalDiameter { get; set; }
+    [Parameter] public double WorkpieceInternalDiameter { get; set; }
+    [Parameter] public double WorkpieceLength { get; set; }
+    [Parameter] public double WorkpieceFacingAllowance { get; set; }
+
+    /// <summary>Заготовка перед этим переходом: при правке — по переходам до него, при добавлении — по всей программе.</summary>
+    /// <summary>Диаметр уже просверленного/расточенного отверстия перед этим переходом — старт чернового цикла расточки.</summary>
+    private double CurrentHoleDiameter => StockBefore?.InternalDiameterAt(-1) ?? WorkpieceInternalDiameter;
+
+    private StockProfile StockBefore
+    {
+        get
+        {
+            if (Program is null || WorkpieceExternalDiameter <= 0) return null;
+            var index = SequenceToEdit is null ? -1 : Program.IndexOf(SequenceToEdit);
+            return StockProfile.Build(Program, index >= 0 ? index : Program.Count, WorkpieceExternalDiameter, WorkpieceInternalDiameter, WorkpieceFacingAllowance);
+        }
+    }
     [Parameter] public EventCallback<Sequence> OnSubmit { get; set; }
 
-    private TurningSequences TurningSequence { get; set; }
+    private TurningSequences TurningSequence { get; set; } = TurningSequences.RoughTurning;
     private CoordinateSystem SelectedCoordinateSystem { get; set; }
     private Coolant SelectedCoolant { get; set; }
     private Tool Tool { get; set; }
@@ -109,6 +128,8 @@ else
     protected override void OnInitialized()
     {
         SelectedCoordinateSystem = CoordinateSystem;
+        SpeedRough = Operation.CuttingSpeedRough(WorkpieceMaterial);
+        SpeedFinish = Operation.CuttingSpeedFinish(WorkpieceMaterial);
         if (SequenceToEdit is not null) LoadFromSequence(SequenceToEdit);
     }
 
@@ -118,7 +139,7 @@ else
         {
             case RoughTurningSequence roughTurning:
                 TurningSequence = TurningSequences.RoughTurning;
-                Tool = roughTurning.Tool;
+                Tool = FromList(roughTurning.Tool);
                 Contour = roughTurning.Contour ?? new() { new Point(null, null) };
                 _FacingStepOver = roughTurning.StepOver.ToPrettyString();
                 _FacingRoughStockAllow = roughTurning.RoughStockAllow.ToPrettyString();
@@ -130,7 +151,7 @@ else
                 break;
             case FinishTurningSequence finishTurning:
                 TurningSequence = TurningSequences.FinishTurning;
-                Tool = finishTurning.Tool;
+                Tool = FromList(finishTurning.Tool);
                 Contour = finishTurning.Contour ?? new() { new Point(null, null) };
                 _FacingStepOver = finishTurning.StepOver.ToPrettyString();
                 _FacingRoughStockAllow = finishTurning.RoughStockAllow.ToPrettyString();
@@ -143,9 +164,20 @@ else
         }
     }
 
+    /// <summary>Инструмент из файла работы — копия, а не объект из списка станка: без подмены он
+    /// не выбран в списке и подписан именем типа. Ищем тот же инструмент в списке (вид, номер,
+    /// параметры); нет такого — оставляем как есть.</summary>
+    private Tool FromList(Tool tool)
+        => tool is null ? null : Tools?.FirstOrDefault(t => t.GetType() == tool.GetType() && t.Position == tool.Position && t.CallDetails == tool.CallDetails) ?? tool;
+
     private void OnToolChanged(Tool value)
     {
         Tool = value;
+        if (value is TurningTool turningTool)
+        {
+            _FeedRough = Operation.FeedRough(turningTool.Radius).ToPrettyString();
+            _FeedFinish = Operation.FeedFinish(turningTool.Radius).ToPrettyString();
+        }
     }
 
     public string ExampleText
@@ -168,7 +200,8 @@ else
                         speedRough: SpeedRough,
                         feedRough: FeedRough,
                         coolant: SelectedCoolant,
-                        seqNumbers: CyclesCount.GetCycleRange());
+                        seqNumbers: CyclesCount.GetCycleRange(),
+                        stockDiameter: Tool is TurningInternalTool ? CurrentHoleDiameter : WorkpieceExternalDiameter);
                     return CurrentSequence.Operation;
                 case TurningSequences.FinishTurning:
                     if (SpeedFinish <= 0 || FeedFinish <= 0 || Contour == null || Contour.Count < 2) return string.Empty;

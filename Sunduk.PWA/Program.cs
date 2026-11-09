@@ -78,6 +78,7 @@ namespace Sunduk.PWA
             builder.Services.AddSingleton<NippleState>();
             builder.Services.AddSingleton<Arc2State>();
             builder.Services.AddSingleton<ArcGeneralState>();
+            builder.Services.AddSingleton<ArcAdvancedState>();
             builder.Services.AddSingleton<ChamferState>();
             builder.Services.AddSingleton<ThreadTurningState>();
             builder.Services.AddSingleton<ToleranceState>();
@@ -90,6 +91,13 @@ namespace Sunduk.PWA
 
             // Scoped по той же причине: зависит от IJSRuntime.
             builder.Services.AddScoped<OfflineStatusMonitor>();
+
+            // Scoped по той же причине: зависит от ILocalStorageService.
+            builder.Services.AddScoped<NavUsage>();
+            builder.Services.AddScoped<AppSettings>();
+
+            // Scoped по той же причине: зависит от IJSRuntime.
+            builder.Services.AddScoped<Sunduk.PWA.Infrastructure.Analytics>();
 
             await builder.Build().RunAsync();
         }

@@ -329,7 +329,7 @@
                                      PanelClass="pa-3">
                                 <MudTabPanel Text="Заготовка" Icon="@Icons.Material.Outlined.Edit">
                                     <MudTextField T="string"
-                                                  Variant="Variant.Filled"
+                                                  Variant="Variant.Text"
                                                   AutoGrow="true"
                                                   @bind-Value="@template.Content"
                                                   Immediate="true"
@@ -341,7 +341,7 @@
 
                                 <MudTabPanel Text="Результат" Icon="@Icons.Material.Outlined.CheckCircle">
                                     <MudTextField T="string"
-                                                  Variant="Variant.Filled"
+                                                  Variant="Variant.Text"
                                                   AutoGrow="true"
                                                   Immediate="true"
                                                   Lines="@Math.Max(10, template.Result.Count(c => c == '\n') + 1)"
@@ -890,7 +890,7 @@
                                 return "[?]";
 
                             var r = sub.Evaluate();
-                            return r is double d ? d.ToString("0.###").Replace(',', '.') :
+                            return r is double d ? d.ToPrettyString(stringOption: Util.PrettyStringOption.AsIs) :
                                    r is int i ? i.ToString() :
                                    r is long l ? l.ToString() :
                                    r?.ToString() ?? "[?]";

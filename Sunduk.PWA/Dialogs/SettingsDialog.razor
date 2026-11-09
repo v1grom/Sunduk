@@ -1,0 +1,91 @@
+@inject AppSettings Settings
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <div>
+                <MudText Typo="Typo.overline" Class="d-block">Внешний вид</MudText>
+                <MudSwitch T="bool" Value="Settings.IsDark" ValueChanged="@(v => Settings.SetDarkAsync(v))" Color="Color.Primary" Label="Тёмная тема" />
+            </div>
+
+            <div>
+                <MudText Typo="Typo.overline" Class="d-block">Нижняя панель на телефоне</MudText>
+                <MudRadioGroup T="NavOrderMode" Value="Settings.NavOrder" ValueChanged="@(v => Settings.SetNavOrderAsync(v))">
+                    <MudRadio Value="NavOrderMode.Default" Color="Color.Primary">Стандартная: режимы, хрень, допуски, база знаний</MudRadio>
+                    <MudRadio Value="NavOrderMode.ByUsage" Color="Color.Primary">По использованию: самые частые разделы</MudRadio>
+                </MudRadioGroup>
+                <MudText Typo="Typo.caption" Class="d-block">«Ещё» остаётся последней кнопкой в любом режиме. Статистика хранится только на этом устройстве.</MudText>
+            </div>
+
+            <div>
+                <MudText Typo="Typo.overline" Class="d-block">Калькулятор режимов</MudText>
+                <MudSwitch T="bool" Value="Settings.CalculatorEnabled" ValueChanged="@(v => Settings.SetCalculatorEnabledAsync(v))" Color="Color.Primary" Label="Калькулятор выражений" />
+                <MudText Typo="Typo.caption" Class="d-block">Если выключен, блок убирается со страницы, а в полях режимов всегда показывается системная клавиатура.</MudText>
+            </div>
+
+            <div>
+                <MudText Typo="Typo.overline" Class="d-block">Точность результатов</MudText>
+                @FormatEditor(Settings.ResultFormat, v => Settings.SetResultFormatAsync(v))
+                <MudText Typo="Typo.caption" Class="d-block">Относится ко всем результатам расчётов, кроме SunduCAM.</MudText>
+            </div>
+
+            <div>
+                <MudText Typo="Typo.overline" Class="d-block">Точность в SunduCAM</MudText>
+                @FormatEditor(Settings.CamFormat, v => Settings.SetCamFormatAsync(v))
+                <MudText Typo="Typo.caption" Class="d-block">Числа в управляющей программе. Хвостовые нули нужны не всем стойкам, по умолчанию их нет.</MudText>
+            </div>
+
+            <div>
+                <MudText Typo="Typo.overline" Class="d-block">Статистика</MudText>
+                <MudSwitch T="bool" Value="Settings.AnalyticsEnabled" ValueChanged="@(v => Settings.SetAnalyticsEnabledAsync(v))" Color="Color.Primary" Label="Анонимная статистика посещений" />
+                <MudText Typo="Typo.caption" Class="d-block">Считает, сколько людей пользуется приложением и какими разделами. Отправляются только адрес страницы, размер экрана и случайный номер устройства, введённые значения, станки и инструменты не отправляются.</MudText>
+            </div>
+
+            <div>
+                <MudText Typo="Typo.overline" Class="d-block">Данные</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.RestartAlt" OnClick="ResetAllAsync">Сбросить всё</MudButton>
+                <MudText Typo="Typo.caption" Class="d-block">Удаляет станки и инструменты, параметры, настройки и значения калькуляторов на этом устройстве.</MudText>
+            </div>
+        </MudStack>
+    </DialogContent>
+</MudDialog>
+
+@code
+{
+    /// <summary> Знаки после точки, хвостовые нули и пример: поле «0.000» / «0.###». </summary>
+    private RenderFragment FormatEditor(ResultFormat format, Func<ResultFormat, Task> save) => __builder =>
+    {
+        <div class="d-flex align-center flex-wrap" style="gap: 16px;">
+            <MudNumericField T="int" Label="Знаков после точки" Variant="Variant.Text" Margin="Margin.Dense"
+                             Style="max-width: 170px;"
+                             Min="0" Max="ResultFormat.MaxDecimals" Step="1"
+                             Value="format.Decimals"
+                             ValueChanged="@(v => save(format with { Decimals = Math.Clamp(v, 0, ResultFormat.MaxDecimals) }))" />
+            <MudSwitch T="bool" Color="Color.Primary" Label="Хвостовые нули"
+                       Disabled="format.Decimals == 0"
+                       Value="format.TrailingZeros"
+                       ValueChanged="@(v => save(format with { TrailingZeros = v }))" />
+        </div>
+        <MudText Typo="Typo.caption" Class="d-block monofield">
+            Формат @format.Pattern: 12.5 → @format.Format(12.5), 0.25 → @format.Format(0.25), 3.14159 → @format.Format(3.14159)
+        </MudText>
+    };
+
+    private async Task ResetAllAsync()
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, "Удалить все данные приложения на этом устройстве: станки, инструменты, параметры и настройки калькуляторов? Это нельзя отменить." },
+            { x => x.OkMessage, "Сбросить" },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Сбросить всё?", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        await Settings.ResetAllAsync();
+        // Полная перезагрузка: состояние калькуляторов и станков живёт ещё и в памяти
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

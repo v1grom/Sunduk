@@ -1,4 +1,7 @@
 using System;
+using Sunduk.PWA.Infrastructure.CAM;
+using System.Linq;
+using Sunduk.Geometry;
 using System.Collections.Generic;
 using Sunduk.PWA.Infrastructure.Sequences.Base;
 using Sunduk.PWA.Infrastructure.Sequences.Turning;
@@ -42,6 +45,81 @@ namespace Sunduk.PWA.Infrastructure
         /// <summary>Сегменты внутреннего диаметра как есть — см. <see cref="ExternalSegments"/>.</summary>
         public IReadOnlyList<(double FromZ, double ToZ, double Diameter)> InternalSegments => _internal;
 
+        private readonly List<ThreadZone> _threads = new();
+
+        /// <summary>Кольцевые полости внутри детали (торцевые канавки): диаметры внутреннего и наружного
+        /// краёв и диапазон Z. Сам профиль «диаметр по Z» кольцо не выражает.</summary>
+        private readonly List<(double FromZ, double ToZ, double InnerDiameter, double OuterDiameter)> _rings = new();
+
+        /// <summary>Кольцевые полости, ограниченные имеющимся материалом: по каждому участку Z, где
+        /// есть наружный материал, кольцо лежит между большим из (его внутренний край, отверстие) и
+        /// меньшим из (его наружный край, наружный диаметр). Радиусы, не диаметры. Кольцо ничего не
+        /// создаёт: вне материала его нет.</summary>
+        public IReadOnlyList<(double FromZ, double ToZ, double InnerRadius, double OuterRadius)> EffectiveRings
+        {
+            get
+            {
+                var result = new List<(double, double, double, double)>();
+                foreach (var ring in _rings)
+                {
+                    var cuts = new SortedSet<double> { ring.FromZ, ring.ToZ };
+                    foreach (var s in _external.Concat(_internal))
+                    {
+                        if (s.FromZ > ring.FromZ && s.FromZ < ring.ToZ) cuts.Add(s.FromZ);
+                        if (s.ToZ > ring.FromZ && s.ToZ < ring.ToZ) cuts.Add(s.ToZ);
+                    }
+                    var points = cuts.ToList();
+                    for (var i = 0; i + 1 < points.Count; i++)
+                    {
+                        var mid = (points[i] + points[i + 1]) / 2;
+                        var outer = Math.Min(ring.OuterDiameter, ExternalDiameterAt(mid));
+                        var inner = Math.Max(ring.InnerDiameter, InternalDiameterAt(mid));
+                        if (ExternalDiameterAt(mid) > 0 && outer > inner) result.Add((points[i], points[i + 1], inner / 2, outer / 2));
+                    }
+                }
+                return result;
+            }
+        }
+
+        private void AddRing(double z1, double z2, double d1, double d2)
+        {
+            var from = Math.Min(z1, z2);
+            var to = Math.Max(z1, z2);
+            if (from < to && Math.Abs(d1 - d2) > 1e-9) _rings.Add((from, to, Math.Min(d1, d2), Math.Max(d1, d2)));
+        }
+
+        /// <summary>Нарезанные резьбы (условно) — для отрисовки линией по среднему диаметру.</summary>
+        public IReadOnlyList<ThreadZone> Threads => _threads;
+
+        /// <summary>Участок резьбы: [FromZ, ToZ], средний диаметр (диаметр резьбы − 0.6495·шаг), снаружи или внутри.</summary>
+        public readonly record struct ThreadZone(double FromZ, double ToZ, double MeanDiameter, bool External);
+
+        /// <summary>Отверстия, ограниченные наружным профилем: там, где наружный диаметр не больше
+        /// диаметра отверстия (деталь ниже срезана — например, сферой после сверления), от отверстия
+        /// остаётся ровно наружный контур, а где материала нет совсем, отверстия нет. Нужно для
+        /// отрисовки: заливка по правилу чётности иначе закрашивает «отверстие в воздухе» и материал
+        /// появляется там, где его нет. Только сегменты с диаметром &gt; 0.</summary>
+        public IReadOnlyList<(double FromZ, double ToZ, double Diameter)> EffectiveInternalSegments
+        {
+            get
+            {
+                var result = new List<(double FromZ, double ToZ, double Diameter)>();
+                foreach (var hole in _internal)
+                {
+                    if (hole.Diameter <= 0) continue;
+                    foreach (var outer in _external)
+                    {
+                        if (outer.Diameter <= 0) continue;
+                        var from = Math.Max(hole.FromZ, outer.FromZ);
+                        var to = Math.Min(hole.ToZ, outer.ToZ);
+                        if (from < to) result.Add((from, to, Math.Min(hole.Diameter, outer.Diameter)));
+                    }
+                }
+                result.Sort((a, b) => a.FromZ.CompareTo(b.FromZ));
+                return result;
+            }
+        }
+
         /// <summary>Резать/сверлить можно только там, где материал физически уже есть — переходы
         /// часто задают Z как безопасную точку подвода (например, сверловка "от Z2", когда торец
         /// уже обработан до 0.2), а не как реальную границу материала. Без клипа такая запись
@@ -49,30 +127,46 @@ namespace Sunduk.PWA.Infrastructure
         /// (заливка через fill-rule=evenodd) это выглядит как ПОЯВИВШИЙСЯ из ниоткуда материал
         /// (нечётное число пересечений вне охватывающего наружного контура = закрашено), хотя
         /// реально там ничего не должно меняться.</summary>
+        /// <summary>Правило профиля: переход ТОЛЬКО убирает материал. Наружный диаметр в зоне записи
+        /// становится меньшим из текущего и нового (контур, канавка или резьба больше заготовки её не
+        /// наращивают), и только там, где материал уже есть.</summary>
         private void WriteExternal(double z1, double z2, double diameter)
         {
             var fromZ = Math.Min(z1, z2);
             var toZ = Math.Max(z1, z2);
-            foreach (var (segFrom, segTo) in ExistingMaterialRanges(fromZ, toZ)) Write(_external, segFrom, segTo, diameter);
+            // ToList: Write перезаписывает _external, а диапазоны лениво читают его же
+            foreach (var (segFrom, segTo, existing) in ExistingMaterialRanges(fromZ, toZ).ToList())
+                Write(_external, segFrom, segTo, Math.Min(existing, diameter));
         }
 
+        /// <summary>Отверстие только расширяется: там, где материал есть, диаметр становится большим из
+        /// текущего (0 — отверстия не было) и нового. Позднее более узкое растачивание/сверло отверстие
+        /// не «заращивает».</summary>
         private void WriteInternal(double z1, double z2, double diameter)
         {
             var fromZ = Math.Min(z1, z2);
             var toZ = Math.Max(z1, z2);
-            foreach (var (segFrom, segTo) in ExistingMaterialRanges(fromZ, toZ)) Write(_internal, segFrom, segTo, diameter);
+            foreach (var (segFrom, segTo, _) in ExistingMaterialRanges(fromZ, toZ).ToList())
+            {
+                foreach (var hole in _internal.ToList())
+                {
+                    var from = Math.Max(segFrom, hole.FromZ);
+                    var to = Math.Min(segTo, hole.ToZ);
+                    if (from < to) Write(_internal, from, to, Math.Max(hole.Diameter, diameter));
+                }
+            }
         }
 
         /// <summary>Части [fromZ, toZ], пересекающиеся с уже существующим наружным материалом
-        /// (Diameter &gt; 0) — см. <see cref="WriteExternal"/>/<see cref="WriteInternal"/>.</summary>
-        private IEnumerable<(double FromZ, double ToZ)> ExistingMaterialRanges(double fromZ, double toZ)
+        /// (Diameter &gt; 0), вместе с его текущим наружным диаметром.</summary>
+        private IEnumerable<(double FromZ, double ToZ, double Diameter)> ExistingMaterialRanges(double fromZ, double toZ)
         {
             foreach (var segment in _external)
             {
                 if (segment.Diameter <= 0) continue;
                 var segFrom = Math.Max(segment.FromZ, fromZ);
                 var segTo = Math.Min(segment.ToZ, toZ);
-                if (segFrom < segTo) yield return (segFrom, segTo);
+                if (segFrom < segTo) yield return (segFrom, segTo, segment.Diameter);
             }
         }
 
@@ -181,12 +275,27 @@ namespace Sunduk.PWA.Infrastructure
                 case TurningExternalRoughGroovingSequence externalRoughGrooving:
                     ApplyGrooving(profile, externalRoughGrooving.Tool, externalRoughGrooving.CuttingPoint, externalRoughGrooving.Width, externalRoughGrooving.InternalDiameter, isExternal: true);
                     break;
+                // Отрезка: деталь (сторона +Z от прорези) отделена от прутка — материала левее
+                // правой кромки прорези больше нет. Показываем отрезанную деталь с её длиной.
+                case TurningCutOffSequence cutOff:
+                    ClipBack(profile, cutOff.CuttingPoint);
+                    break;
+                // Резьба резцом (условно): наружная — вершины витков дают номинальный диаметр
+                // резьбы на длине нарезания, внутренняя — отверстие становится диаметром резьбы.
+                case ThreadCuttingSequence threadCutting:
+                    profile.ApplyThread(threadCutting.Type == CuttingType.External, threadCutting.StartZ, threadCutting.EndZ, threadCutting.ThreadDiameter, threadCutting.ThreadPitch);
+                    break;
+                // Метчик: отверстие в зоне нарезания становится номинальным диаметром резьбы.
+                case TappingSequence tapping:
+                    profile.ApplyThread(false, tapping.StartZ, tapping.EndZ, tapping.Tool.Diameter, tapping.Tool.Pitch);
+                    break;
                 case TurningFaceGroovingSequence faceGrooving:
-                    // у торцевых канавок Width/CuttingPoint — это сразу Z-начало/Z-конец, а не якорь+протяжённость
-                    profile.WriteExternal(faceGrooving.Width, faceGrooving.CuttingPoint, faceGrooving.InternalDiameter);
+                    // торцевая канавка — кольцевая полость: Width/CuttingPoint — Z-начало/Z-конец, диаметры —
+                    // наружный и внутренний край кольца
+                    profile.AddRing(faceGrooving.Width, faceGrooving.CuttingPoint, faceGrooving.ExternalDiameter, faceGrooving.InternalDiameter);
                     break;
                 case TurningFaceRoughGroovingSequence faceRoughGrooving:
-                    profile.WriteExternal(faceRoughGrooving.Width, faceRoughGrooving.CuttingPoint, faceRoughGrooving.InternalDiameter);
+                    profile.AddRing(faceRoughGrooving.Width, faceRoughGrooving.CuttingPoint, faceRoughGrooving.ExternalDiameter, faceRoughGrooving.InternalDiameter);
                     break;
             }
         }
@@ -199,30 +308,135 @@ namespace Sunduk.PWA.Infrastructure
         /// внутреннему после него было бы не с чем пересекаться.</summary>
         private static void ClipFace(StockProfile profile, double faceZ)
         {
+            profile.TrimThreads(faceZ, double.PositiveInfinity);
             Write(profile._external, faceZ, double.PositiveInfinity, 0);
             Write(profile._internal, faceZ, double.PositiveInfinity, 0);
         }
 
+        /// <summary>
+        /// Резьба (условно, без профиля витков). Наружная: в зоне нарезания диаметр становится
+        /// номинальным диаметром резьбы, но не больше, чем был (резьба не наращивает металл).
+        /// Внутренняя/метчик: отверстие расширяется до диаметра резьбы, но только там, где отверстие
+        /// уже есть и меньше (в сплошном металле метчик/резец без отверстия ничего не делает).
+        /// </summary>
+        private void ApplyThread(bool external, double z1, double z2, double diameter, double pitch)
+        {
+            var fromZ = Math.Min(z1, z2);
+            var toZ = Math.Max(z1, z2);
+            var list = external ? _external : _internal;
+            foreach (var segment in list.ToList())
+            {
+                if (segment.Diameter <= 0) continue;
+                var from = Math.Max(segment.FromZ, fromZ);
+                var to = Math.Min(segment.ToZ, toZ);
+                if (from >= to) continue;
+                if (external) WriteExternal(from, to, diameter);
+                else if (segment.Diameter > 0) WriteInternal(from, to, diameter);
+                // средний диаметр метрической резьбы: d − 0.6495·P
+                if (external || segment.Diameter > 0) _threads.Add(new ThreadZone(from, to, diameter - 0.6495 * pitch, external));
+            }
+        }
+
+        /// <summary>Убирает из зон резьбы участок [from, to], где материала больше нет.</summary>
+        private void TrimThreads(double from, double to)
+        {
+            for (var i = _rings.Count - 1; i >= 0; i--)
+            {
+                var r = _rings[i];
+                var parts = new List<(double FromZ, double ToZ, double InnerDiameter, double OuterDiameter)>();
+                if (r.FromZ < from) parts.Add(r with { ToZ = Math.Min(r.ToZ, from) });
+                if (r.ToZ > to) parts.Add(r with { FromZ = Math.Max(r.FromZ, to) });
+                _rings.RemoveAt(i);
+                _rings.InsertRange(i, parts.Where(p => p.FromZ < p.ToZ));
+            }
+            for (var i = _threads.Count - 1; i >= 0; i--)
+            {
+                var t = _threads[i];
+                var parts = new List<ThreadZone>();
+                if (t.FromZ < from) parts.Add(t with { ToZ = Math.Min(t.ToZ, from) });
+                if (t.ToZ > to) parts.Add(t with { FromZ = Math.Max(t.FromZ, to) });
+                _threads.RemoveAt(i);
+                _threads.InsertRange(i, parts.Where(p => p.FromZ < p.ToZ));
+            }
+        }
+
+        /// <summary>Отрезка: убирает материал левее <paramref name="edgeZ"/> (в сторону −Z, к патрону)
+        /// — и наружный, и внутренний профиль. Как и <see cref="ClipFace"/>, пишет напрямую.</summary>
+        private static void ClipBack(StockProfile profile, double edgeZ)
+        {
+            profile.TrimThreads(double.NegativeInfinity, edgeZ);
+            Write(profile._external, double.NegativeInfinity, edgeZ, 0);
+            Write(profile._internal, double.NegativeInfinity, edgeZ, 0);
+        }
+
         private static void ApplyGrooving(StockProfile profile, TurningGroovingTool tool, double cuttingPoint, double width, double diameter, bool isExternal)
         {
-            var startPoint = tool.ZeroPoint == TurningGroovingTool.Point.Right ? cuttingPoint : cuttingPoint - tool.Width;
-            var endPoint = startPoint - (width - tool.Width);
-            if (isExternal) profile.WriteExternal(startPoint, endPoint, diameter);
-            else profile.WriteInternal(startPoint, endPoint, diameter);
+            // Правый край канавки — в точке резания (от какого угла резца отсчитан нуль, влияет только
+            // на программируемый Z), протяжённость — полная ширина канавки, а не путь, который проходит
+            // кромка резца (он короче на ширину самого резца).
+            var endPoint = cuttingPoint - width;
+            if (isExternal) profile.WriteExternal(cuttingPoint, endPoint, diameter);
+            else profile.WriteInternal(cuttingPoint, endPoint, diameter);
         }
+
+        /// <summary>Шагов на одну дугу и на один наклонный участок: профиль хранится ступенями
+        /// постоянного диаметра, поэтому конус/дугу приходится аппроксимировать.</summary>
+        private const int ContourSteps = 48;
 
         private static void ApplyContour(StockProfile profile, TurningTool tool, List<Element> contour)
         {
             if (contour is null || contour.Count < 2 || tool is null) return;
             var isExternal = tool is TurningExternalTool;
             if (!isExternal && tool is not TurningInternalTool) return;
-            for (var i = 0; i < contour.Count - 1; i++)
+
+            // координаты с подстановкой пропущенных (как в G-коде)
+            var points = new List<(double X, double Z, Element Source)>();
+            double? px = null, pz = null;
+            foreach (var e in contour)
             {
-                var from = contour[i];
-                var to = contour[i + 1];
-                if (from.Z is null || to.Z is null || to.X is null) continue;
-                if (isExternal) profile.WriteExternal(from.Z.Value, to.Z.Value, to.X.Value);
-                else profile.WriteInternal(from.Z.Value, to.Z.Value, to.X.Value);
+                var x = e.X ?? px;
+                var z = e.Z ?? pz;
+                if (x is null || z is null) { px = x; pz = z; continue; }
+                points.Add((x.Value, z.Value, e));
+                px = x; pz = z;
+            }
+
+            for (var i = 1; i < points.Count; i++)
+            {
+                var (x1, z1, _) = points[i - 1];
+                var (x2, z2, source) = points[i];
+                if (Math.Abs(z2 - z1) < 1e-9) continue; // торцевой участок: диаметр по Z не меняется
+
+                // сэмпл вдоль участка: (Z, диаметр)
+                var samples = new List<(double Z, double X)> { (z1, x1) };
+                var arc = source as Arc;
+                var center = arc is null ? null : ArcConstructions.ArcCenter(x1 / 2, z1, x2 / 2, z2, arc.Radius, arc.Direction);
+                if (arc is not null && center is { } c)
+                {
+                    var a1 = Math.Atan2(x1 / 2 - c.X, z1 - c.Z);
+                    var a2 = Math.Atan2(x2 / 2 - c.X, z2 - c.Z);
+                    var sweep = a2 - a1;
+                    while (sweep > Math.PI) sweep -= 2 * Math.PI;
+                    while (sweep < -Math.PI) sweep += 2 * Math.PI;
+                    for (var k = 1; k < ContourSteps; k++)
+                    {
+                        var angle = a1 + sweep * k / ContourSteps;
+                        samples.Add((c.Z + arc.Radius * Math.Cos(angle), 2 * (c.X + arc.Radius * Math.Sin(angle))));
+                    }
+                }
+                else if (Math.Abs(x2 - x1) > 1e-9)
+                {
+                    for (var k = 1; k < ContourSteps; k++)
+                        samples.Add((z1 + (z2 - z1) * k / ContourSteps, x1 + (x2 - x1) * k / ContourSteps));
+                }
+                samples.Add((z2, x2));
+
+                for (var k = 0; k + 1 < samples.Count; k++)
+                {
+                    var diameter = (samples[k].X + samples[k + 1].X) / 2;
+                    if (isExternal) profile.WriteExternal(samples[k].Z, samples[k + 1].Z, diameter);
+                    else profile.WriteInternal(samples[k].Z, samples[k + 1].Z, diameter);
+                }
             }
         }
     }
