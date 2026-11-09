@@ -1,366 +1,115 @@
 using MudBlazor;
+using System;
+using System.Collections.Generic;
 
 namespace Sunduk.PWA.Infrastructure;
 
+/// <summary>
+/// Темы MudBlazor. Цвета не задаются здесь: они берутся из <see cref="SkinCatalog"/>, который
+/// генерируется из <c>tokens.json</c> репозитория design (<c>python tools/build.py mudblazor</c>).
+/// Здесь только сопоставление токенов с ролями MudBlazor.
+/// </summary>
 public static class AppTheme
 {
-    public static MudTheme GetTheme(bool isDark, bool isAmber) =>
-        (isDark, isAmber) switch
-        {
-            (true, true) => AmberDark,
-            (true, false) => OrangeDark,
-            (false, true) => AmberLight,
-            (false, false) => OrangeLight,
-        };
+    /// <summary> Скин по умолчанию — оригинальные цвета Sunduk. </summary>
+    public const string DefaultSkin = "sunduk";
 
-    // ── Amber accent ──
+    private static readonly Dictionary<string, MudTheme> Cache = [];
 
-    public static MudTheme AmberDark { get; } = new()
+    /// <summary> Тема скина сразу для обеих схем: светлая и тёмная переключаются через IsDarkMode. </summary>
+    public static MudTheme Get(string skin)
     {
-        Typography = BuildTypography(),
-        PaletteLight = new PaletteLight()
-        {
-            Primary = "#F59E0B",
-            PrimaryDarken = "#D97706",
-            PrimaryLighten = "#FBBF24",
-            Secondary = "#10B981",
-            Tertiary = "#6366F1",
-            Info = "#38BDF8",
-            Success = "#10B981",
-            Warning = "#F59E0B",
-            Error = "#EF4444",
-            Dark = "#181A1B",
-            Background = "#181A1B",
-            BackgroundGray = "#1E2022",
-            Surface = "#25282B",
-            DrawerBackground = "#1E2022",
-            DrawerText = "rgba(255,255,255, 0.70)",
-            DrawerIcon = "rgba(255,255,255, 0.70)",
-            AppbarBackground = "#1E2022",
-            AppbarText = "rgba(255,255,255, 0.87)",
-            TextPrimary = "rgba(255,255,255, 0.87)",
-            TextSecondary = "rgba(255,255,255, 0.60)",
-            TextDisabled = "rgba(255,255,255, 0.28)",
-            ActionDefault = "rgba(255,255,255, 0.56)",
-            ActionDisabled = "rgba(255,255,255, 0.26)",
-            ActionDisabledBackground = "rgba(255,255,255, 0.12)",
-            Divider = "rgba(255,255,255, 0.12)",
-            DividerLight = "rgba(255,255,255, 0.06)",
-            TableLines = "rgba(255,255,255, 0.12)",
-            TableStriped = "rgba(255,255,255, 0.03)",
-            TableHover = "rgba(255,255,255, 0.06)",
-            LinesDefault = "rgba(255,255,255, 0.12)",
-            LinesInputs = "rgba(255,255,255, 0.20)",
-            GrayDefault = "#6B7280",
-            GrayLight = "#9CA3AF",
-            GrayDark = "#374151",
-            GrayDarker = "#1F2937",
-            OverlayDark = "rgba(0,0,0, 0.50)",
-            OverlayLight = "rgba(255,255,255, 0.05)",
-        },
-        PaletteDark = new PaletteDark()
-        {
-            Primary = "#F59E0B",
-            PrimaryDarken = "#D97706",
-            PrimaryLighten = "#FBBF24",
-            Secondary = "#10B981",
-            Tertiary = "#6366F1",
-            Info = "#38BDF8",
-            Success = "#10B981",
-            Warning = "#F59E0B",
-            Error = "#EF4444",
-            Dark = "#181A1B",
-            Background = "#181A1B",
-            BackgroundGray = "#1E2022",
-            Surface = "#25282B",
-            DrawerBackground = "#1E2022",
-            DrawerText = "rgba(255,255,255, 0.70)",
-            DrawerIcon = "rgba(255,255,255, 0.70)",
-            AppbarBackground = "#1E2022",
-            AppbarText = "rgba(255,255,255, 0.87)",
-            TextPrimary = "rgba(255,255,255, 0.87)",
-            TextSecondary = "rgba(255,255,255, 0.60)",
-            TextDisabled = "rgba(255,255,255, 0.28)",
-            ActionDefault = "rgba(255,255,255, 0.56)",
-            ActionDisabled = "rgba(255,255,255, 0.26)",
-            ActionDisabledBackground = "rgba(255,255,255, 0.12)",
-            Divider = "rgba(255,255,255, 0.12)",
-            DividerLight = "rgba(255,255,255, 0.06)",
-            TableLines = "rgba(255,255,255, 0.12)",
-            TableStriped = "rgba(255,255,255, 0.03)",
-            TableHover = "rgba(255,255,255, 0.06)",
-            LinesDefault = "rgba(255,255,255, 0.12)",
-            LinesInputs = "rgba(255,255,255, 0.20)",
-            GrayDefault = "#6B7280",
-            GrayLight = "#9CA3AF",
-            GrayDark = "#374151",
-            GrayDarker = "#1F2937",
-            OverlayDark = "rgba(0,0,0, 0.50)",
-            OverlayLight = "rgba(255,255,255, 0.05)",
-        }
+        skin = Normalize(skin);
+        if (!Cache.TryGetValue(skin, out var theme))
+            Cache[skin] = theme = Build(skin);
+        return theme;
+    }
+
+    /// <summary> Неизвестное имя (например, из старого или повреждённого хранилища) заменяется скином по умолчанию. </summary>
+    public static string Normalize(string? skin) =>
+        skin is not null && Array.IndexOf(SkinCatalog.Names, skin) >= 0 ? skin : DefaultSkin;
+
+    /// <summary> Названия палитр в параметрах: v1grom (идентификатор personal в design), areopag, sunduk. </summary>
+    public static string Title(string skin) => skin switch
+    {
+        "personal" => "v1grom",
+        _ => skin,
     };
 
-    public static MudTheme AmberLight { get; } = new()
+    private static MudTheme Build(string skin) => new()
     {
         Typography = BuildTypography(),
-        PaletteLight = new PaletteLight()
-        {
-            Primary = "#D97706",
-            PrimaryDarken = "#B45309",
-            PrimaryLighten = "#F59E0B",
-            Secondary = "#059669",
-            Tertiary = "#4F46E5",
-            Info = "#0EA5E9",
-            Success = "#059669",
-            Warning = "#D97706",
-            Error = "#DC2626",
-            Dark = "#111827",
-            Background = "#F5F5F5",
-            BackgroundGray = "#E5E5E5",
-            Surface = "#FFFFFF",
-            DrawerBackground = "#FFFFFF",
-            DrawerText = "rgba(0,0,0, 0.70)",
-            DrawerIcon = "rgba(0,0,0, 0.70)",
-            AppbarBackground = "#FFFFFF",
-            AppbarText = "rgba(0,0,0, 0.87)",
-            TextPrimary = "rgba(0,0,0, 0.87)",
-            TextSecondary = "rgba(0,0,0, 0.60)",
-            TextDisabled = "rgba(0,0,0, 0.28)",
-            ActionDefault = "rgba(0,0,0, 0.56)",
-            ActionDisabled = "rgba(0,0,0, 0.26)",
-            ActionDisabledBackground = "rgba(0,0,0, 0.12)",
-            Divider = "rgba(0,0,0, 0.12)",
-            DividerLight = "rgba(0,0,0, 0.06)",
-            TableLines = "rgba(0,0,0, 0.12)",
-            TableStriped = "rgba(0,0,0, 0.03)",
-            TableHover = "rgba(0,0,0, 0.06)",
-            LinesDefault = "rgba(0,0,0, 0.12)",
-            LinesInputs = "rgba(0,0,0, 0.20)",
-            GrayDefault = "#9CA3AF",
-            GrayLight = "#D1D5DB",
-            GrayDark = "#6B7280",
-            GrayDarker = "#374151",
-            OverlayDark = "rgba(0,0,0, 0.30)",
-            OverlayLight = "rgba(0,0,0, 0.05)",
-        },
-        PaletteDark = new PaletteDark()
-        {
-            Primary = "#D97706",
-            PrimaryDarken = "#B45309",
-            PrimaryLighten = "#F59E0B",
-            Secondary = "#059669",
-            Tertiary = "#4F46E5",
-            Info = "#0EA5E9",
-            Success = "#059669",
-            Warning = "#D97706",
-            Error = "#DC2626",
-            Dark = "#111827",
-            Background = "#F5F5F5",
-            BackgroundGray = "#E5E5E5",
-            Surface = "#FFFFFF",
-            DrawerBackground = "#FFFFFF",
-            DrawerText = "rgba(0,0,0, 0.70)",
-            DrawerIcon = "rgba(0,0,0, 0.70)",
-            AppbarBackground = "#FFFFFF",
-            AppbarText = "rgba(0,0,0, 0.87)",
-            TextPrimary = "rgba(0,0,0, 0.87)",
-            TextSecondary = "rgba(0,0,0, 0.60)",
-            TextDisabled = "rgba(0,0,0, 0.28)",
-            ActionDefault = "rgba(0,0,0, 0.56)",
-            ActionDisabled = "rgba(0,0,0, 0.26)",
-            ActionDisabledBackground = "rgba(0,0,0, 0.12)",
-            Divider = "rgba(0,0,0, 0.12)",
-            DividerLight = "rgba(0,0,0, 0.06)",
-            TableLines = "rgba(0,0,0, 0.12)",
-            TableStriped = "rgba(0,0,0, 0.03)",
-            TableHover = "rgba(0,0,0, 0.06)",
-            LinesDefault = "rgba(0,0,0, 0.12)",
-            LinesInputs = "rgba(0,0,0, 0.20)",
-            GrayDefault = "#9CA3AF",
-            GrayLight = "#D1D5DB",
-            GrayDark = "#6B7280",
-            GrayDarker = "#374151",
-            OverlayDark = "rgba(0,0,0, 0.30)",
-            OverlayLight = "rgba(0,0,0, 0.05)",
-        }
+        // Прямые углы: тени и скругления в дизайн-системе не используются
+        LayoutProperties = new LayoutProperties { DefaultBorderRadius = "0px" },
+        PaletteLight = ToLight(SkinCatalog.Get(skin, dark: false)),
+        PaletteDark = ToDark(SkinCatalog.Get(skin, dark: true)),
     };
 
-    // ── Orange accent ──
-
-    public static MudTheme OrangeDark { get; } = new()
+    private static PaletteLight ToLight(SkinTokens t)
     {
-        Typography = BuildTypography(),
-        PaletteLight = new PaletteLight()
-        {
-            Primary = "#FF5722",
-            PrimaryDarken = "#E64A19",
-            PrimaryLighten = "#FF8A65",
-            Secondary = "#10B981",
-            Tertiary = "#6366F1",
-            Info = "#38BDF8",
-            Success = "#10B981",
-            Warning = "#FF9800",
-            Error = "#EF4444",
-            Dark = "#181A1B",
-            Background = "#181A1B",
-            BackgroundGray = "#1E2022",
-            Surface = "#25282B",
-            DrawerBackground = "#1E2022",
-            DrawerText = "rgba(255,255,255, 0.70)",
-            DrawerIcon = "rgba(255,255,255, 0.70)",
-            AppbarBackground = "#1E2022",
-            AppbarText = "rgba(255,255,255, 0.87)",
-            TextPrimary = "rgba(255,255,255, 0.87)",
-            TextSecondary = "rgba(255,255,255, 0.60)",
-            TextDisabled = "rgba(255,255,255, 0.28)",
-            ActionDefault = "rgba(255,255,255, 0.56)",
-            ActionDisabled = "rgba(255,255,255, 0.26)",
-            ActionDisabledBackground = "rgba(255,255,255, 0.12)",
-            Divider = "rgba(255,255,255, 0.12)",
-            DividerLight = "rgba(255,255,255, 0.06)",
-            TableLines = "rgba(255,255,255, 0.12)",
-            TableStriped = "rgba(255,255,255, 0.03)",
-            TableHover = "rgba(255,255,255, 0.06)",
-            LinesDefault = "rgba(255,255,255, 0.12)",
-            LinesInputs = "rgba(255,255,255, 0.20)",
-            GrayDefault = "#6B7280",
-            GrayLight = "#9CA3AF",
-            GrayDark = "#374151",
-            GrayDarker = "#1F2937",
-            OverlayDark = "rgba(0,0,0, 0.50)",
-            OverlayLight = "rgba(255,255,255, 0.05)",
-        },
-        PaletteDark = new PaletteDark()
-        {
-            Primary = "#FF5722",
-            PrimaryDarken = "#E64A19",
-            PrimaryLighten = "#FF8A65",
-            Secondary = "#10B981",
-            Tertiary = "#6366F1",
-            Info = "#38BDF8",
-            Success = "#10B981",
-            Warning = "#FF9800",
-            Error = "#EF4444",
-            Dark = "#181A1B",
-            Background = "#181A1B",
-            BackgroundGray = "#1E2022",
-            Surface = "#25282B",
-            DrawerBackground = "#1E2022",
-            DrawerText = "rgba(255,255,255, 0.70)",
-            DrawerIcon = "rgba(255,255,255, 0.70)",
-            AppbarBackground = "#1E2022",
-            AppbarText = "rgba(255,255,255, 0.87)",
-            TextPrimary = "rgba(255,255,255, 0.87)",
-            TextSecondary = "rgba(255,255,255, 0.60)",
-            TextDisabled = "rgba(255,255,255, 0.28)",
-            ActionDefault = "rgba(255,255,255, 0.56)",
-            ActionDisabled = "rgba(255,255,255, 0.26)",
-            ActionDisabledBackground = "rgba(255,255,255, 0.12)",
-            Divider = "rgba(255,255,255, 0.12)",
-            DividerLight = "rgba(255,255,255, 0.06)",
-            TableLines = "rgba(255,255,255, 0.12)",
-            TableStriped = "rgba(255,255,255, 0.03)",
-            TableHover = "rgba(255,255,255, 0.06)",
-            LinesDefault = "rgba(255,255,255, 0.12)",
-            LinesInputs = "rgba(255,255,255, 0.20)",
-            GrayDefault = "#6B7280",
-            GrayLight = "#9CA3AF",
-            GrayDark = "#374151",
-            GrayDarker = "#1F2937",
-            OverlayDark = "rgba(0,0,0, 0.50)",
-            OverlayLight = "rgba(255,255,255, 0.05)",
-        }
-    };
+        var p = new PaletteLight();
+        Apply(p, t);
+        return p;
+    }
 
-    public static MudTheme OrangeLight { get; } = new()
+    private static PaletteDark ToDark(SkinTokens t)
     {
-        Typography = BuildTypography(),
-        PaletteLight = new PaletteLight()
-        {
-            Primary = "#E64A19",
-            PrimaryDarken = "#BF360C",
-            PrimaryLighten = "#FF7043",
-            Secondary = "#059669",
-            Tertiary = "#4F46E5",
-            Info = "#0EA5E9",
-            Success = "#059669",
-            Warning = "#F57C00",
-            Error = "#DC2626",
-            Dark = "#111827",
-            Background = "#F5F5F5",
-            BackgroundGray = "#E5E5E5",
-            Surface = "#FFFFFF",
-            DrawerBackground = "#FFFFFF",
-            DrawerText = "rgba(0,0,0, 0.70)",
-            DrawerIcon = "rgba(0,0,0, 0.70)",
-            AppbarBackground = "#FFFFFF",
-            AppbarText = "rgba(0,0,0, 0.87)",
-            TextPrimary = "rgba(0,0,0, 0.87)",
-            TextSecondary = "rgba(0,0,0, 0.60)",
-            TextDisabled = "rgba(0,0,0, 0.28)",
-            ActionDefault = "rgba(0,0,0, 0.56)",
-            ActionDisabled = "rgba(0,0,0, 0.26)",
-            ActionDisabledBackground = "rgba(0,0,0, 0.12)",
-            Divider = "rgba(0,0,0, 0.12)",
-            DividerLight = "rgba(0,0,0, 0.06)",
-            TableLines = "rgba(0,0,0, 0.12)",
-            TableStriped = "rgba(0,0,0, 0.03)",
-            TableHover = "rgba(0,0,0, 0.06)",
-            LinesDefault = "rgba(0,0,0, 0.12)",
-            LinesInputs = "rgba(0,0,0, 0.20)",
-            GrayDefault = "#9CA3AF",
-            GrayLight = "#D1D5DB",
-            GrayDark = "#6B7280",
-            GrayDarker = "#374151",
-            OverlayDark = "rgba(0,0,0, 0.30)",
-            OverlayLight = "rgba(0,0,0, 0.05)",
-        },
-        PaletteDark = new PaletteDark()
-        {
-            Primary = "#E64A19",
-            PrimaryDarken = "#BF360C",
-            PrimaryLighten = "#FF7043",
-            Secondary = "#059669",
-            Tertiary = "#4F46E5",
-            Info = "#0EA5E9",
-            Success = "#059669",
-            Warning = "#F57C00",
-            Error = "#DC2626",
-            Dark = "#111827",
-            Background = "#F5F5F5",
-            BackgroundGray = "#E5E5E5",
-            Surface = "#FFFFFF",
-            DrawerBackground = "#FFFFFF",
-            DrawerText = "rgba(0,0,0, 0.70)",
-            DrawerIcon = "rgba(0,0,0, 0.70)",
-            AppbarBackground = "#FFFFFF",
-            AppbarText = "rgba(0,0,0, 0.87)",
-            TextPrimary = "rgba(0,0,0, 0.87)",
-            TextSecondary = "rgba(0,0,0, 0.60)",
-            TextDisabled = "rgba(0,0,0, 0.28)",
-            ActionDefault = "rgba(0,0,0, 0.56)",
-            ActionDisabled = "rgba(0,0,0, 0.26)",
-            ActionDisabledBackground = "rgba(0,0,0, 0.12)",
-            Divider = "rgba(0,0,0, 0.12)",
-            DividerLight = "rgba(0,0,0, 0.06)",
-            TableLines = "rgba(0,0,0, 0.12)",
-            TableStriped = "rgba(0,0,0, 0.03)",
-            TableHover = "rgba(0,0,0, 0.06)",
-            LinesDefault = "rgba(0,0,0, 0.12)",
-            LinesInputs = "rgba(0,0,0, 0.20)",
-            GrayDefault = "#9CA3AF",
-            GrayLight = "#D1D5DB",
-            GrayDark = "#6B7280",
-            GrayDarker = "#374151",
-            OverlayDark = "rgba(0,0,0, 0.30)",
-            OverlayLight = "rgba(0,0,0, 0.05)",
-        }
-    };
+        var p = new PaletteDark();
+        Apply(p, t);
+        return p;
+    }
+
+    private static void Apply(Palette p, SkinTokens t)
+    {
+        p.Primary = t.Accent;
+        p.PrimaryContrastText = t.AccentText;
+        p.Secondary = t.Success;
+        p.SecondaryContrastText = t.Bg;
+        p.Tertiary = t.Info;
+        p.TertiaryContrastText = t.Bg;
+        p.Info = t.Info;
+        p.Success = t.Success;
+        p.Warning = t.Warning;
+        p.Error = t.Danger;
+        p.Dark = t.Bg;
+        p.Black = t.Bg;
+
+        p.Background = t.Bg;
+        p.BackgroundGray = t.Hover;
+        p.Surface = t.Surface;
+        p.DrawerBackground = t.Surface;
+        p.DrawerText = t.Text2;
+        p.DrawerIcon = t.Text2;
+        p.AppbarBackground = t.Surface;
+        p.AppbarText = t.Text;
+
+        p.TextPrimary = t.Text;
+        p.TextSecondary = t.Text2;
+        p.TextDisabled = t.Text3;
+        p.ActionDefault = t.Text2;
+        p.ActionDisabled = t.Text3;
+        p.ActionDisabledBackground = t.Hover;
+
+        p.Divider = t.Border;
+        p.DividerLight = t.Border;
+        p.LinesDefault = t.Border;
+        p.LinesInputs = t.Border;
+        p.TableLines = t.Border;
+        p.TableHover = t.Hover;
+        p.TableStriped = t.Hover;
+
+        p.GrayDefault = t.Text3;
+        p.GrayLight = t.Border;
+        p.GrayDark = t.Text2;
+        p.GrayDarker = t.Hover;
+        p.OverlayDark = "rgba(0,0,0,0.50)";
+        p.OverlayLight = "rgba(255,255,255,0.05)";
+    }
 
     private static Typography BuildTypography()
     {
         var t = new Typography();
-        t.Default.FontFamily = ["Inter", "system-ui", "Segoe UI", "sans-serif"];
+        t.Default.FontFamily = ["Fira Sans", "system-ui", "Segoe UI", "sans-serif"];
         t.Default.LetterSpacing = "0";
         t.Button.TextTransform = "none";
         t.Button.LetterSpacing = "0.01em";
