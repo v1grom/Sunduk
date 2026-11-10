@@ -42,10 +42,10 @@
                             </div>
                             <div class="cnt-dir"></div>
                             <div class="cnt-f">
-                                <MudTextField @bind-Value="point.X" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="X" Margin="Margin.Dense" Converter="Util.NullableDoubleConverterWithZero" />
+                                <MudTextField @bind-Value="point.X" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="X" Margin="Margin.Dense" Converter="Util.DimensionConverter" />
                             </div>
                             <div class="cnt-f">
-                                <MudTextField @bind-Value="point.Z" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="Z" Margin="Margin.Dense" Converter="Util.NullableDoubleConverterWithZero" />
+                                <MudTextField @bind-Value="point.Z" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="Z" Margin="Margin.Dense" Converter="Util.DimensionConverter" />
                             </div>
                             <div class="cnt-f"></div>
                             <div class="cnt-f">
@@ -61,10 +61,10 @@
                             </div>
                             <div class="cnt-dir"></div>
                             <div class="cnt-f">
-                                <MudTextField @bind-Value="line.X" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="X" Margin="Margin.Dense" Converter="Util.NullableDoubleConverterWithZero" />
+                                <MudTextField @bind-Value="line.X" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="X" Margin="Margin.Dense" Converter="Util.DimensionConverter" />
                             </div>
                             <div class="cnt-f">
-                                <MudTextField @bind-Value="line.Z" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="Z" Margin="Margin.Dense" Converter="Util.NullableDoubleConverterWithZero" />
+                                <MudTextField @bind-Value="line.Z" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="Z" Margin="Margin.Dense" Converter="Util.DimensionConverter" />
                             </div>
                             <div class="cnt-f">
                                 <MudTextField @bind-Value="line.Angle" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="A°" Margin="Margin.Dense" Converter="Util.DoubleConverter" />
@@ -89,10 +89,10 @@
                                 </MudTooltip>
                             </div>
                             <div class="cnt-f">
-                                <MudTextField @bind-Value="arc.X" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="X" Margin="Margin.Dense" Converter="Util.NullableDoubleConverterWithZero" />
+                                <MudTextField @bind-Value="arc.X" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="X" Margin="Margin.Dense" Converter="Util.DimensionConverter" />
                             </div>
                             <div class="cnt-f">
-                                <MudTextField @bind-Value="arc.Z" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="Z" Margin="Margin.Dense" Converter="Util.NullableDoubleConverterWithZero" />
+                                <MudTextField @bind-Value="arc.Z" @bind-Value:after="Notify" Variant="Variant.Text" Immediate="true" Label="Z" Margin="Margin.Dense" Converter="Util.DimensionConverter" />
                             </div>
                             <div class="cnt-f"></div>
                             <div class="cnt-f">
@@ -113,6 +113,9 @@
                     </div>
                 </div>
             }
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block px-2 pt-1">
+                В X и Z можно вводить размер с допуском — подставится середина поля: 30h7, 30+0.1/-0.05, 45±0.1
+            </MudText>
         </MudItem>
         <MudItem xs="12" lg="6">
             @{ var scene = BuildScene(); }
@@ -200,7 +203,9 @@
     public double FacingAllowance { get; set; }
 
     /// <summary>Подпись R/C у узла. Собирается как разметка (элемент text в Razor-блоке кода
-    /// трактуется как служебный тег); все подставляемые значения — числа или экранированный текст.</summary>
+    /// трактуется как служебный тег); все подставляемые значения — числа или экранированный текст.
+    /// Подпись ставится с той стороны узла, где нет скругления/фаски: у выпуклого угла наружной
+    /// обработки — справа сверху, у вогнутого — слева снизу.</summary>
     static string CornerMarkup(TurningScene scene, CornerMark mark)
     {
         var color = mark.Applied ? "var(--mud-palette-primary)" : "var(--mud-palette-error)";
@@ -209,7 +214,7 @@
         var hint = System.Net.WebUtility.HtmlEncode(mark.Reason ?? "Скругление/фаска применены");
         var label = System.Net.WebUtility.HtmlEncode(mark.Label + (mark.Applied ? string.Empty : " ✕"));
         return $"<circle cx=\"{TurningScene.F(x)}\" cy=\"{TurningScene.F(y)}\" r=\"2.5\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1\"/>" +
-               $"<text x=\"{TurningScene.F(x + 6)}\" y=\"{TurningScene.F(y - 6)}\" font-size=\"11\" fill=\"{color}\"><title>{hint}</title>{label}</text>";
+               $"<text x=\"{TurningScene.F(x + 6 * mark.SideZ)}\" y=\"{TurningScene.F(mark.SideR > 0 ? y - 6 : y + 14)}\" text-anchor=\"{(mark.SideZ > 0 ? "start" : "end")}\" font-size=\"11\" fill=\"{color}\"><title>{hint}</title>{label}</text>";
     }
 
     TurningScene BuildScene()

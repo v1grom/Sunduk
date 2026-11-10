@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Sunduk.PWA.Infrastructure.Sequences;
 using Sunduk.Geometry.ContourElements;
@@ -144,13 +145,12 @@ namespace Sunduk.PWA.Infrastructure.Templates
                         _ => 0,
                     };
                     var startBluntType = element is Sunduk.Geometry.ContourElements.Line startLine ? startLine.BluntType : Blunt.Radius;
-                    var startSuffix = BluntSuffix(startBlunt, startBluntType, toolRadius, 0, contour);
+                    var startSuffix = BluntSuffix(startBlunt, startBluntType, 0, contour);
                     if (startSuffix.Length > 0)
                     {
-                        var compensated = CompensatedBluntSize(startBlunt, startBluntType, toolRadius);
-                        // «мнимая линия» по торцу: у наружной обработки торец идёт от оси к узлу (подвод снизу), у
-                        // внутренней — от узла вверх
-                        var approachX = externalTool ? x.Value - 2 * compensated : x.Value + 2 * compensated;
+                        // «мнимая линия» по торцу начинается там, откуда пойдёт скругление/фаска: у наружной
+                        // обработки торец идёт от оси к узлу (подвод снизу), у внутренней — от узла вверх
+                        var approachX = StartBluntApproachX(contour, externalTool) ?? x.Value;
                         var firstFeed = feedOnFirstMove ? $" F{feed.NC()}" : string.Empty;
                         if (feedOnFirstMove) feedEmitted = true;
                         if (approachClearance > 0)
@@ -194,10 +194,10 @@ namespace Sunduk.PWA.Infrastructure.Templates
                         Line($"{(arc.Direction == Sunduk.Geometry.Direction.CW ? "G2" : "G3")} X{x.Value.NC()} Z{z.Value.NC()} R{arc.Radius.NC()}{speedFeedSuffix}");
                         break;
                     case Point point:
-                        Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{BluntSuffix(point.Blunt, Blunt.Radius, toolRadius, i, contour)}{speedFeedSuffix}");
+                        Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{BluntSuffix(point.Blunt, Blunt.Radius, i, contour)}{speedFeedSuffix}");
                         break;
                     case Sunduk.Geometry.ContourElements.Line line:
-                        Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{BluntSuffix(line.Blunt, line.BluntType, toolRadius, i, contour)}{speedFeedSuffix}");
+                        Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{BluntSuffix(line.Blunt, line.BluntType, i, contour)}{speedFeedSuffix}");
                         break;
                     default:
                         Line($"G1 X{x.Value.NC()} Z{z.Value.NC()}{speedFeedSuffix}");
@@ -217,20 +217,113 @@ namespace Sunduk.PWA.Infrastructure.Templates
             return arc.Radius * 2 >= chord;
         }
 
-        private static double CompensatedBluntSize(double blunt, Blunt bluntType, double toolRadius)
-            => bluntType is Blunt.SimpleChamfer ? blunt + toolRadius / 2 : blunt + toolRadius;
+        /// <summary>X (диаметр) начала «мнимой линии» по торцу перед первым узлом, на котором задано
+        /// скругление/фаска: узел минус длина притупления вдоль торца (у скругления R·tg(θ/2), где θ —
+        /// поворот от торца к следующему участку; у фаски — её размер). null — притупления на первом
+        /// узле нет или адресом R/C оно не пишется.</summary>
+        internal static double? StartBluntApproachX(List<Element> contour, bool externalTool)
+        {
+            if (contour is null || contour.Count < 2 || contour[0].X is null || contour[0].Z is null) return null;
+            var (blunt, type) = contour[0] switch
+            {
+                Point p => (p.Blunt, Blunt.Radius),
+                Sunduk.Geometry.ContourElements.Line l => (l.Blunt, l.BluntType),
+                _ => (0d, Blunt.Radius),
+            };
+            if (BluntSuffix(blunt, type, 0, contour).Length == 0) return null;
+            var length = blunt;
+            if (type is not Blunt.SimpleChamfer)
+            {
+                var dx = ((contour[1].X ?? contour[0].X.Value) - contour[0].X.Value) / 2;
+                var dz = (contour[1].Z ?? contour[0].Z.Value) - contour[0].Z.Value;
+                var len = Math.Sqrt(dx * dx + dz * dz);
+                if (len > 1e-9)
+                {
+                    var cos = Math.Clamp((externalTool ? dx : -dx) / len, -1, 1);
+                    length = blunt * Math.Tan(Math.Acos(cos) / 2);
+                }
+            }
+            return externalTool ? contour[0].X.Value - 2 * length : contour[0].X.Value + 2 * length;
+        }
 
-        private static string BluntSuffix(double blunt, Blunt bluntType, double toolRadius, int index, List<Element> contour)
+        /// <summary>Адрес R/C на перемещении к узлу. Размер берётся как есть: радиус пластины в нём уже
+        /// учтён компенсатором (<see cref="Geometry.ToolTipCompensation"/>), вместе со знаком для
+        /// выпуклого/вогнутого угла.</summary>
+        internal static string BluntSuffix(double blunt, Blunt bluntType, int index, List<Element> contour)
         {
             if (blunt <= 0 || index + 1 >= contour.Count) return string.Empty;
-            // R/C-адрес скругляет угол между ДВУМЯ прямыми (см. Geometry.ToolTipCompensation) —
-            // если следующий элемент контура дуга, контроллер так скруглить не умеет; такой узел
-            // либо уже материализован в отдельную маленькую дугу компенсатором (Blunt тогда уже
-            // обнулён), либо остаётся её известным ограничением — в обоих случаях адрес R/C сюда
-            // писать нельзя.
+            // R/C-адрес скругляет угол между ДВУМЯ прямыми — если следующий элемент контура дуга,
+            // контроллер так скруглить не умеет; такой узел компенсатор уже материализовал отдельной
+            // маленькой дугой (Blunt тогда обнулён).
             if (contour[index + 1] is Arc) return string.Empty;
             var isChamfer = bluntType is Blunt.SimpleChamfer;
-            return $" {(isChamfer ? "C" : "R")}{CompensatedBluntSize(blunt, bluntType, toolRadius).NC()}";
+            return $" {(isChamfer ? "C" : "R")}{blunt.NC()}";
+        }
+
+        /// <summary>
+        /// Модальная запись перемещений: из кадра убирается G0/G1/G2/G3, если он совпадает с действующим,
+        /// и координаты X/Z, если они не изменились. Кадр с номером N (границы
+        /// профиля цикла — по первому кадру контроллер определяет тип цикла) и любой кадр с другим
+        /// G-кодом (цикл, референт) остаются как есть, после постороннего G-кода состояние
+        /// сбрасывается. Кадр, в котором после этого не осталось перемещения, пропускается.
+        /// </summary>
+        public static string Modal(string gcode)
+        {
+            if (string.IsNullOrEmpty(gcode)) return gcode;
+            var trailingNewLine = gcode.EndsWith('\n');
+            var lines = (trailingNewLine ? gcode[..^1] : gcode).Split('\n');
+            return string.Join("\n", Modal(lines)) + (trailingNewLine ? "\n" : string.Empty);
+        }
+
+        /// <inheritdoc cref="Modal(string)"/>
+        public static List<string> Modal(IEnumerable<string> lines)
+        {
+            var result = new List<string>();
+            string motion = null, lastX = null, lastZ = null;
+            foreach (var line in lines)
+            {
+                var tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+                var comment = line.Contains('(');
+                var foreignCode = tokens.Any(t => t.Length > 1 && t[0] == 'G' && MotionCode(t) is null);
+                if (comment || foreignCode || tokens.Any(t => t[0] is 'U' or 'W'))
+                {
+                    result.Add(line);
+                    motion = lastX = lastZ = null;
+                    continue;
+                }
+
+                var lineMotion = tokens.Select(MotionCode).FirstOrDefault(m => m is not null);
+                var x = tokens.FirstOrDefault(t => t[0] == 'X');
+                var z = tokens.FirstOrDefault(t => t[0] == 'Z');
+                if (lineMotion is null && x is null && z is null) { result.Add(line); continue; }
+
+                var numbered = tokens.Any(t => t[0] == 'N');
+                if (!numbered)
+                {
+                    var moved = (x is not null && x != lastX) || (z is not null && z != lastZ);
+                    if (lineMotion is not null && lineMotion == motion)
+                        tokens.RemoveAll(t => MotionCode(t) is not null);
+                    if (x is not null && x == lastX) tokens.Remove(x);
+                    if (z is not null && z == lastZ) tokens.Remove(z);
+                    // перемещения нет: остаются только слова, которые без него смысла не имеют (R/C угла)
+                    if (!moved && (x is not null || z is not null))
+                        tokens.RemoveAll(t => t[0] is 'R' or 'C');
+                    if (tokens.Count > 0 && tokens.All(t => MotionCode(t) is not null) && lineMotion == motion) tokens.Clear();
+                }
+
+                motion = lineMotion ?? motion;
+                lastX = x ?? lastX;
+                lastZ = z ?? lastZ;
+                if (tokens.Count > 0) result.Add(string.Join(" ", tokens));
+            }
+            return result;
+        }
+
+        /// <summary>G0–G3 в нормализованном виде (G01 → G1); null — слово не код перемещения.</summary>
+        private static string MotionCode(string token)
+        {
+            if (token.Length < 2 || token[0] != 'G' || !int.TryParse(token.AsSpan(1), out var code)) return null;
+            return code is >= 0 and <= 3 ? $"G{code}" : null;
         }
 
         public override string ToString() => _sb.ToString();

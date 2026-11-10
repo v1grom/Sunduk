@@ -510,6 +510,14 @@ namespace Sunduk.PWA.Infrastructure
             text => string.IsNullOrEmpty(text) || text is "-" ? null : (double?)text.GetDouble(0, GetNumberOption.Any));
 
         /// <summary>
+        /// Конвертер координаты контура: кроме числа принимает размер с допуском (30h7, 30+0.1/-0.05,
+        /// 45±0.1) и подставляет середину поля — см. <see cref="Tolerances.DimensionInput"/>.
+        /// </summary>
+        public static IConverter<double?, string?> DimensionConverter = Conversions.From(
+            (double? value) => value?.ToPrettyString(stringOption: PrettyStringOption.AsIs),
+            text => Tolerances.DimensionInput.Parse(text));
+
+        /// <summary>
         /// Конвертер отверстий для фрезерной сверловки
         /// </summary>
         public static IConverter<int, string?> HolesConverter = Conversions.From(

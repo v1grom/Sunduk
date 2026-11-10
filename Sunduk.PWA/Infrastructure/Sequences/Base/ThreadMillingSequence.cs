@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Sunduk.PWA.Infrastructure.Sequences.Base
 {
-    public abstract class ThreadMillingSequence : Sequence
+    public abstract class ThreadMillingSequence : Sequence, IHoleGridSequence
     {
         
         public CoordinateSystem CoordinateSystem { get; set; }
@@ -24,6 +24,9 @@ namespace Sunduk.PWA.Infrastructure.Sequences.Base
         public bool FullCut { get; set; }
         public List<Hole> Holes { get; set; }
         public bool Polar { get; set; }
+
+        /// <inheritdoc/>
+        public HoleGrid Grid { get; set; }
         public double SafePlane { get; set; }
 
         public override string Name

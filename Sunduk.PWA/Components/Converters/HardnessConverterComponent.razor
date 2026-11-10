@@ -1,0 +1,105 @@
+@inject RoughnessState State
+<MudGrid Spacing="1" Class="pa-2">
+    <MudItem xs="5" sm="4">
+        <MudField Label="Шкала" Variant="Variant.Filled" Underline="false">
+            <MudSelect T="Hardness.Scale" @bind-Value="State.HardnessScale" Variant="Variant.Text" Margin="Margin.Dense">
+                @foreach (var scale in Scales)
+                {
+                    <MudSelectItem Value="@scale">@Name(scale)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudField>
+    </MudItem>
+    <MudItem xs="7" sm="8">
+        <MudField Label="Значение" Variant="Variant.Filled" Underline="false">
+            <MudTextField Class="monofield" @bind-Value="State.HardnessValue" T="string" Variant="Variant.Text" InputMode="@(InputMode.@decimal)"
+                          Adornment="Adornment.End" AdornmentText="@Unit(State.HardnessScale)" Immediate="true" Margin="Margin.Dense" />
+        </MudField>
+    </MudItem>
+    <MudItem xs="12">
+        <MudField Label="Результат" Variant="Variant.Filled" Underline="false">
+            @if (Value <= 0)
+            {
+                var (min, max) = Hardness.Range(State.HardnessScale);
+                <MudText Typo="Typo.body2">Введите значение от @Format(State.HardnessScale, min) до @Format(State.HardnessScale, max)</MudText>
+            }
+            else if (!InRange)
+            {
+                var (min, max) = Hardness.Range(State.HardnessScale);
+                <MudText Typo="Typo.body2" Color="Color.Error">Вне таблицы: @Name(State.HardnessScale) от @Format(State.HardnessScale, min) до @Format(State.HardnessScale, max)</MudText>
+            }
+            else
+            {
+                @foreach (var scale in Scales.Where(s => s != State.HardnessScale))
+                {
+                    var converted = Hardness.Convert(State.HardnessScale, scale, Value);
+                    <MudText Typo="Typo.body2" Class="monofield">@Name(scale): @(converted is null ? "—" : $"{Format(scale, converted.Value)} {Unit(scale)}")</MudText>
+                }
+            }
+        </MudField>
+    </MudItem>
+    <MudItem xs="12">
+        <MudText Typo="Typo.body2" Class="px-1">
+            Перевод приближённый, по сравнительной таблице для нелегированных и низколегированных сталей (DIN EN ISO 18265), между строками — линейная интерполяция.
+            Для чугуна, нержавеющих и цветных сплавов соотношения другие.
+        </MudText>
+    </MudItem>
+    <MudItem xs="12">
+        <MudExpansionPanel Class="rounded-0" Text="Таблица целиком">
+            <MudSimpleTable Dense="true" Elevation="0" Class="monofield" Style="background: transparent;">
+                <thead>
+                    <tr><th>HV</th><th>HB</th><th>HRC</th><th>σв, МПа</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Hardness.Table)
+                    {
+                        <tr>
+                            <td>@Cell(Hardness.Scale.HV, row.HV)</td>
+                            <td>@Cell(Hardness.Scale.HB, row.HB)</td>
+                            <td>@Cell(Hardness.Scale.HRC, row.HRC)</td>
+                            <td>@Cell(Hardness.Scale.Strength, row.Strength)</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudExpansionPanel>
+    </MudItem>
+</MudGrid>
+
+@code
+{
+    static readonly Hardness.Scale[] Scales = { Hardness.Scale.HRC, Hardness.Scale.HB, Hardness.Scale.HV, Hardness.Scale.Strength };
+
+    double Value => Util.GetDouble(State.HardnessValue);
+
+    bool InRange
+    {
+        get
+        {
+            var (min, max) = Hardness.Range(State.HardnessScale);
+            return Value >= min && Value <= max;
+        }
+    }
+
+    static string Name(Hardness.Scale scale) => scale switch
+    {
+        Hardness.Scale.HRC => "HRC (Роквелл C)",
+        Hardness.Scale.HB => "HB (Бринелль)",
+        Hardness.Scale.HV => "HV (Виккерс)",
+        _ => "Предел прочности σв",
+    };
+
+    static string Unit(Hardness.Scale scale) => scale switch
+    {
+        Hardness.Scale.HRC => "HRC",
+        Hardness.Scale.HB => "HB",
+        Hardness.Scale.HV => "HV",
+        _ => "МПа",
+    };
+
+    /// <summary>HRC — с десятыми, остальные шкалы — до целых.</summary>
+    static string Format(Hardness.Scale scale, double value)
+        => Math.Round(value, scale is Hardness.Scale.HRC ? 1 : 0).ToString(scale is Hardness.Scale.HRC ? "0.0" : "0", CultureInfo.InvariantCulture);
+
+    static string Cell(Hardness.Scale scale, double? value) => value is null ? "—" : Format(scale, value.Value);
+}

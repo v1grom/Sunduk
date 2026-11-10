@@ -383,57 +383,46 @@ namespace Sunduk.PWA.Infrastructure
         /// постоянного диаметра, поэтому конус/дугу приходится аппроксимировать.</summary>
         private const int ContourSteps = 48;
 
+        /// <summary>Длина ступени по Z, мм: мельче на рисунке не разглядеть.</summary>
+        private const double ContourStepLength = 0.1;
+
+        /// <summary>Число ступеней для участка длиной <paramref name="lengthZ"/> по Z: фаске в 1 мм
+        /// хватает десятка, длинному конусу — не больше <see cref="ContourSteps"/>. Число сегментов
+        /// профиля прямо определяет скорость перерисовки заготовки.</summary>
+        private static int StepsFor(double lengthZ)
+            => Math.Clamp((int)Math.Ceiling(Math.Abs(lengthZ) / ContourStepLength), 2, ContourSteps);
+
         private static void ApplyContour(StockProfile profile, TurningTool tool, List<Element> contour)
         {
             if (contour is null || contour.Count < 2 || tool is null) return;
             var isExternal = tool is TurningExternalTool;
             if (!isExternal && tool is not TurningInternalTool) return;
 
-            // координаты с подстановкой пропущенных (как в G-коде)
-            var points = new List<(double X, double Z, Element Source)>();
-            double? px = null, pz = null;
-            foreach (var e in contour)
-            {
-                var x = e.X ?? px;
-                var z = e.Z ?? pz;
-                if (x is null || z is null) { px = x; pz = z; continue; }
-                points.Add((x.Value, z.Value, e));
-                px = x; pz = z;
-            }
+            // Чертёжный контур вместе со скруглениями и фасками на узлах — тот же, что рисует превью
+            // перехода: заготовка после перехода должна совпадать с тем, что реально снимет G-код.
+            var path = Visualization.TurningToolpath.Build(contour, isExternal);
+            if (path is null) return;
 
-            for (var i = 1; i < points.Count; i++)
+            foreach (var move in path.Nominal)
             {
-                var (x1, z1, _) = points[i - 1];
-                var (x2, z2, source) = points[i];
-                if (Math.Abs(z2 - z1) < 1e-9) continue; // торцевой участок: диаметр по Z не меняется
-
-                // сэмпл вдоль участка: (Z, диаметр)
-                var samples = new List<(double Z, double X)> { (z1, x1) };
-                var arc = source as Arc;
-                var center = arc is null ? null : ArcConstructions.ArcCenter(x1 / 2, z1, x2 / 2, z2, arc.Radius, arc.Direction);
-                if (arc is not null && center is { } c)
+                // сэмпл вдоль участка: (Z, радиус); прямая делится на те же шаги, что и дуга
+                var samples = new List<Visualization.Pt>();
+                if (move.IsArc)
                 {
-                    var a1 = Math.Atan2(x1 / 2 - c.X, z1 - c.Z);
-                    var a2 = Math.Atan2(x2 / 2 - c.X, z2 - c.Z);
-                    var sweep = a2 - a1;
-                    while (sweep > Math.PI) sweep -= 2 * Math.PI;
-                    while (sweep < -Math.PI) sweep += 2 * Math.PI;
-                    for (var k = 1; k < ContourSteps; k++)
-                    {
-                        var angle = a1 + sweep * k / ContourSteps;
-                        samples.Add((c.Z + arc.Radius * Math.Cos(angle), 2 * (c.X + arc.Radius * Math.Sin(angle))));
-                    }
+                    samples.AddRange(move.Sample(StepsFor(move.To.Z - move.From.Z)));
                 }
-                else if (Math.Abs(x2 - x1) > 1e-9)
+                else
                 {
-                    for (var k = 1; k < ContourSteps; k++)
-                        samples.Add((z1 + (z2 - z1) * k / ContourSteps, x1 + (x2 - x1) * k / ContourSteps));
+                    if (Math.Abs(move.To.Z - move.From.Z) < 1e-9) continue; // торцевой участок: диаметр по Z не меняется
+                    var steps = Math.Abs(move.To.R - move.From.R) > 1e-9 ? StepsFor(move.To.Z - move.From.Z) : 1;
+                    for (var k = 0; k <= steps; k++)
+                        samples.Add(new Visualization.Pt(move.From.Z + (move.To.Z - move.From.Z) * k / steps, move.From.R + (move.To.R - move.From.R) * k / steps));
                 }
-                samples.Add((z2, x2));
 
                 for (var k = 0; k + 1 < samples.Count; k++)
                 {
-                    var diameter = (samples[k].X + samples[k + 1].X) / 2;
+                    if (Math.Abs(samples[k + 1].Z - samples[k].Z) < 1e-9) continue;
+                    var diameter = samples[k].R + samples[k + 1].R; // среднее двух радиусов × 2
                     if (isExternal) profile.WriteExternal(samples[k].Z, samples[k + 1].Z, diameter);
                     else profile.WriteInternal(samples[k].Z, samples[k + 1].Z, diameter);
                 }

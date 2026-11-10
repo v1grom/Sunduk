@@ -1,0 +1,76 @@
+@inject RoughnessState State
+<MudGrid Spacing="1" Class="pa-2">
+    <MudItem xs="6">
+        <MudField Label="Ra" Variant="Variant.Filled" Underline="false">
+            <MudTextField Class="monofield" Value="State.ConverterRa" ValueChanged="@((string v) => SetRa(v))" T="string" Variant="Variant.Text"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
+        </MudField>
+    </MudItem>
+    <MudItem xs="6">
+        <MudField Label="Rz" Variant="Variant.Filled" Underline="false">
+            <MudTextField Class="monofield" Value="State.ConverterRz" ValueChanged="@((string v) => SetRz(v))" T="string" Variant="Variant.Text"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
+        </MudField>
+    </MudItem>
+    <MudItem xs="12">
+        <MudText Typo="Typo.body2" Class="px-1">
+            Пересчёт приближённый (ГОСТ 2789): Rz ≈ 4·Ra для Ra от @Roughness.RaRuleBorder.ToString(CultureInfo.InvariantCulture) и грубее, Rz ≈ 5·Ra для более тонких поверхностей.
+            Точного соотношения нет — оно зависит от способа обработки.
+        </MudText>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudField Label="Классы чистоты (ГОСТ 2789-59)" Variant="Variant.Filled" Underline="false">
+            <MudSimpleTable Dense="true" Elevation="0" Class="monofield" Style="background: transparent;">
+                <thead>
+                    <tr><th>Класс</th><th>Ra, мкм</th><th>Rz, мкм</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Roughness.Classes)
+                    {
+                        <tr>
+                            <td>∇@c.Number</td>
+                            <td>@c.Ra.ToString(CultureInfo.InvariantCulture)</td>
+                            <td>@c.Rz.ToString(CultureInfo.InvariantCulture)</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudField>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudField Label="Степени ISO 1302" Variant="Variant.Filled" Underline="false">
+            <MudSimpleTable Dense="true" Elevation="0" Class="monofield" Style="background: transparent;">
+                <thead>
+                    <tr><th>Степень</th><th>Ra, мкм</th><th>Rz ≈, мкм</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var g in Roughness.Grades)
+                    {
+                        <tr>
+                            <td>@g.Name</td>
+                            <td>@g.Ra.ToString(CultureInfo.InvariantCulture)</td>
+                            <td>@Math.Round(Roughness.RaToRz(g.Ra), 3).ToString(CultureInfo.InvariantCulture)</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudField>
+    </MudItem>
+</MudGrid>
+
+@code
+{
+    void SetRa(string value)
+    {
+        State.ConverterRa = value;
+        var ra = Util.GetDouble(value);
+        State.ConverterRz = ra > 0 ? Math.Round(Roughness.RaToRz(ra), 3).ToString(CultureInfo.InvariantCulture) : string.Empty;
+    }
+
+    void SetRz(string value)
+    {
+        State.ConverterRz = value;
+        var rz = Util.GetDouble(value);
+        State.ConverterRa = rz > 0 ? Math.Round(Roughness.RzToRa(rz), 3).ToString(CultureInfo.InvariantCulture) : string.Empty;
+    }
+}

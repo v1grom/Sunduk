@@ -61,6 +61,14 @@ namespace Sunduk.PWA.Infrastructure
         /// </summary>
         public bool TrailingReferentPoint { get; set; } = true;
 
+        /// <summary>
+        /// Модальный вывод перемещений по контуру: G0/G1/G2/G3 и координаты X/Z не повторяются в
+        /// кадре, если не изменились относительно предыдущего (см.
+        /// <see cref="Templates.GCodeBuilder.Modal(string)"/>). По умолчанию выключено — каждый кадр
+        /// пишется полностью.
+        /// </summary>
+        public bool ModalMotion { get; set; }
+
         public HeaderStyle HeaderStyle { get; set; }
 
         /// <summary>

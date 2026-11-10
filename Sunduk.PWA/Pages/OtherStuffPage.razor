@@ -18,6 +18,12 @@
         <MudTabPanel Text="Расточка">
             <HoleCapacityComponent />
         </MudTabPanel>
+        <MudTabPanel Text="Шероховатость">
+            <RoughnessComponent />
+        </MudTabPanel>
+        <MudTabPanel Text="Фрезерование">
+            <MillingComponent />
+        </MudTabPanel>
 
     </MudTabs>
 </MudSwipeArea>
@@ -42,7 +48,7 @@
         }
         else if (args.SwipeDirection == SwipeDirection.RightToLeft)
         {
-            if (tabs.GetState(x => x.ActivePanelIndex) < 4)
+            if (tabs.GetState(x => x.ActivePanelIndex) < 6)
             {
                 tabs.ActivatePanelAsync(tabs.GetState(x => x.ActivePanelIndex) + 1);
             }

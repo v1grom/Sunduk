@@ -34,6 +34,9 @@ public class ContourCompensationTests
         yield return new object[] { "дуга в конце контура CW", new List<Element> { new Point(20, 0), new Line(20, -5), new Arc(30, -10, 5, Direction.CW) } };
         yield return new object[] { "дуга в начале и в конце", new List<Element> { new Point(10, 0), new Arc(30, -10, 10, Direction.CCW), new Line(30, -20), new Arc(40, -25, 5, Direction.CCW) } };
         yield return new object[] { "вогнутая дуга между цилиндрами", new List<Element> { new Point(20, 0), new Line(20, -8), new Arc(30, -14, 8, Direction.CW), new Line(30, -30) } };
+        yield return new object[] { "R на прямых углах: выпуклые и вогнутые", new List<Element> { new Point(20, 0, 1), new Line(20, -12, 0, 1.5), new Line(32, -12, 0, 2), new Line(32, -25, 0, 0.2), new Line(44, -25), new Line(44, -40) } };
+        yield return new object[] { "R на узлах у конуса", new List<Element> { new Point(16, 0, 1), new Line(28, -10, 0, 2), new Line(28, -20, 0, 1.5), new Line(40, -26, 0, 1), new Line(40, -40) } };
+        yield return new object[] { "притупление перед дугой: выпуклый и вогнутый угол", new List<Element> { new Point(16, 0, 1), new Arc(30, -6, 12, Direction.CCW), new Line(30, -18, 0, 1.5), new Arc(40, -26, 6, Direction.CCW), new Line(40, -40) } };
         yield return new object[] { "наклонная после дуги", new List<Element> { new Point(20, 0), new Line(20, -5), new Arc(30, -10, 5, Direction.CCW), new Line(40, -20), new Line(40, -30) } };
     }
 

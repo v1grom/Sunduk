@@ -1,0 +1,37 @@
+@* Поля расположения отверстий сеткой — общие для сверления, нарезания резьбы и резьбофрезерования. *@
+<MudItem xs="6" sm="3">
+    <MudTextField Class="monofield" Label="X первого" @bind-Value="Grid.X" @bind-Value:after="Notify" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" Converter="Util.DoubleConverter" />
+</MudItem>
+<MudItem xs="6" sm="3">
+    <MudTextField Class="monofield" Label="Y первого" @bind-Value="Grid.Y" @bind-Value:after="Notify" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" Converter="Util.DoubleConverter" />
+</MudItem>
+<MudItem xs="6" sm="3">
+    <MudTextField Class="monofield" Label="Шаг по X" @bind-Value="Grid.StepX" @bind-Value:after="Notify" Variant="Variant.Text" Margin="Margin.Dense" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Converter="Util.DoubleConverter" />
+</MudItem>
+<MudItem xs="6" sm="3">
+    <MudTextField Class="monofield" Label="Шаг по Y" @bind-Value="Grid.StepY" @bind-Value:after="Notify" Variant="Variant.Text" Margin="Margin.Dense" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Converter="Util.DoubleConverter" />
+</MudItem>
+<MudItem xs="6" sm="3">
+    <MudNumericField Label="Отверстий по X" T="int" Min="1" @bind-Value="Grid.CountX" @bind-Value:after="Notify" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
+</MudItem>
+<MudItem xs="6" sm="3">
+    <MudNumericField Label="Рядов по Y" T="int" Min="1" @bind-Value="Grid.CountY" @bind-Value:after="Notify" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
+</MudItem>
+<MudItem xs="6" sm="3">
+    <MudTextField Class="monofield" Label="Поворот сетки" @bind-Value="Grid.Angle" @bind-Value:after="Notify" Variant="Variant.Text" Margin="Margin.Dense" Adornment="Adornment.End" AdornmentText="°" Immediate="true" Converter="Util.DoubleConverter" />
+</MudItem>
+<MudItem xs="6" sm="3">
+    <MudCheckBox T="bool" @bind-Value="Grid.Zigzag" @bind-Value:after="Notify" Label="Змейкой" Dense="true" />
+</MudItem>
+<MudItem xs="12">
+    <MudText Typo="Typo.caption" Color="Color.Secondary">Всего отверстий: @Grid.Count. Отрицательный шаг ведёт сетку в минус по оси.</MudText>
+</MudItem>
+
+@code {
+    [Parameter, EditorRequired] public HoleGrid Grid { get; set; } = default!;
+
+    /// <summary>Сетка изменилась — родителю нужно перестроить предпросмотр программы.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    Task Notify() => Changed.InvokeAsync();
+}

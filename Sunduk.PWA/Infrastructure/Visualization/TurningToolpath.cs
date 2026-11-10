@@ -68,6 +68,21 @@ namespace Sunduk.PWA.Infrastructure.Visualization
     public sealed record CornerMark(Pt Node, double Size, Blunt Type, string? Reason)
     {
         public bool Applied => Reason is null;
+
+        /// <summary>Куда от узла вынести подпись, чтобы она не легла на контур: в сторону, обратную
+        /// скруглению/фаске (от середины притупления к вершине угла). Знаки по Z и по радиусу; у узла
+        /// без построенного притупления — вправо вверх.</summary>
+        public int SideZ { get; init; } = 1;
+
+        /// <inheritdoc cref="SideZ"/>
+        public int SideR { get; init; } = 1;
+
+        /// <summary>Метка узла, у которого построено притупление от <paramref name="from"/> до <paramref name="to"/>.</summary>
+        public static CornerMark Built(Pt node, double size, Blunt type, Pt from, Pt to) => new(node, size, type, null)
+        {
+            SideZ = node.Z - (from.Z + to.Z) / 2 < -1e-9 ? -1 : 1,
+            SideR = node.R - (from.R + to.R) / 2 < -1e-9 ? -1 : 1,
+        };
         public string Label => (Type is Blunt.SimpleChamfer ? "C" : "R") + Math.Round(Size, 3).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
@@ -166,7 +181,31 @@ namespace Sunduk.PWA.Infrastructure.Visualization
                 if (blunt <= 0) continue;
                 if (IsValidArc(i + 1))
                 {
-                    marks?.Add(new CornerMark(pts[i], blunt, type, "дальше дуга — R/C не применяется"));
+                    // прямая → дуга: адреса R/C тут нет, G-код вставляет отдельную дугу сопряжения
+                    // (см. ToolTipCompensation.LineArcFillet) — рисуем её же, с нулевым радиусом пластины
+                    var arcNext = (ArcElement)nodes[i + 1];
+                    var fillet = i > 0 && IsValidArc(i)
+                        ? null
+                        : ToolTipCompensation.LineArcFillet(
+                            i == 0 ? (double?)null : pts[i - 1].R, i == 0 ? (double?)null : pts[i - 1].Z,
+                            pts[i].R, pts[i].Z, pts[i + 1].R, pts[i + 1].Z,
+                            arcNext.Radius, arcNext.Direction, blunt, 0, external);
+                    if (fillet is { } f)
+                    {
+                        var filletIn = new Pt(f.StartZ, f.StartX);
+                        var filletOut = new Pt(f.EndZ, f.EndX);
+                        corners[i] = new Corner
+                        {
+                            In = filletIn,
+                            Out = filletOut,
+                            Move = new PathMove { From = filletIn, To = filletOut, Radius = f.Radius, Direction = f.Direction },
+                        };
+                        marks?.Add(CornerMark.Built(pts[i], blunt, Blunt.Radius, filletIn, filletOut));
+                    }
+                    else
+                    {
+                        marks?.Add(new CornerMark(pts[i], blunt, type, "скругление перед дугой построить нельзя"));
+                    }
                     continue;
                 }
                 var size = blunt;
@@ -188,7 +227,9 @@ namespace Sunduk.PWA.Infrastructure.Visualization
                 var limitOut = Dist(pts[i], b) * 0.5;
                 var rounded = RoundCorner(a, pts[i], b, size, type, limitIn, limitOut);
                 if (rounded is not null) corners[i] = rounded;
-                marks?.Add(new CornerMark(pts[i], blunt, type, rounded is null ? "стороны угла на одной прямой" : null));
+                marks?.Add(rounded is null
+                    ? new CornerMark(pts[i], blunt, type, "стороны угла на одной прямой")
+                    : CornerMark.Built(pts[i], blunt, type, rounded.In, rounded.Out));
             }
             // последний узел: следующего перемещения нет, G-код R/C на нём не пишет
             if (marks is not null)

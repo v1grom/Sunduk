@@ -148,18 +148,25 @@
         </MudItem>
         @if (MachineType == MachineType.Milling)
         {
-            <MudItem xs="@(HolesSetter is HolesSetterType.Cylinder ? 4 : 6)">
-                <MudNumericField Label="Количество отверстий" T="int" Min="1" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" Converter="Util.HolesConverter" ValueChanged="OnHolesCountChanged" />
-            </MudItem>
+            @if (HolesSetter is not HolesSetterType.Grid)
+            {
+                <MudItem xs="@(HolesSetter is HolesSetterType.Cylinder ? 4 : 6)">
+                    <MudNumericField Label="Количество отверстий" T="int" Min="1" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" Converter="Util.HolesConverter" ValueChanged="OnHolesCountChanged" />
+                </MudItem>
+            }
             <MudItem xs="@(HolesSetter is HolesSetterType.Cylinder ? 4 : 6)">
                 <MudSelect Label="Расположение" T="HolesSetterType" @bind-Value="HolesSetter" Variant="Variant.Text" Margin="Margin.Dense">
                     <MudSelectItem Value="@(HolesSetterType.Manual)">Вручную</MudSelectItem>
                     <MudSelectItem Value="@(HolesSetterType.Cylinder)">На цилиндре</MudSelectItem>
                     <MudSelectItem Value="@(HolesSetterType.EvenlyCylinder)">Равномерно на цилиндре</MudSelectItem>
+            <MudSelectItem Value="@(HolesSetterType.Grid)">Сеткой</MudSelectItem>
                 </MudSelect>
             </MudItem>
             switch (HolesSetter)
             {
+                case HolesSetterType.Grid:
+                    <HoleGridFields Grid="Grid" Changed="StateHasChanged" />
+                    break;
                 case HolesSetterType.Manual:
                     @foreach (var hole in Holes)
                     {
@@ -254,18 +261,25 @@
         </MudItem>
         @if (MachineType == MachineType.Milling)
         {
-            <MudItem xs="@(HolesSetter is not HolesSetterType.Cylinder ? 6 : 4)" md="4">
-                <MudNumericField Label="Количество отверстий" T="int" Min="1" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" Converter="Util.HolesConverter" ValueChanged="OnHolesCountChanged" />
-            </MudItem>
+            @if (HolesSetter is not HolesSetterType.Grid)
+            {
+                <MudItem xs="@(HolesSetter is not HolesSetterType.Cylinder ? 6 : 4)" md="4">
+                    <MudNumericField Label="Количество отверстий" T="int" Min="1" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" Converter="Util.HolesConverter" ValueChanged="OnHolesCountChanged" />
+                </MudItem>
+            }
             <MudItem xs="@(HolesSetter is not HolesSetterType.Cylinder ? 6 : 4)" md="4">
                 <MudSelect Label="Расположение" T="HolesSetterType" @bind-Value="HolesSetter" Variant="Variant.Text" Margin="Margin.Dense">
                     <MudSelectItem Value="@(HolesSetterType.Manual)">Вручную</MudSelectItem>
                     <MudSelectItem Value="@(HolesSetterType.Cylinder)">На цилиндре</MudSelectItem>
                     <MudSelectItem Value="@(HolesSetterType.EvenlyCylinder)">Равномерно на цилиндре</MudSelectItem>
+            <MudSelectItem Value="@(HolesSetterType.Grid)">Сеткой</MudSelectItem>
                 </MudSelect>
             </MudItem>
             switch (HolesSetter)
             {
+                case HolesSetterType.Grid:
+                    <HoleGridFields Grid="Grid" Changed="StateHasChanged" />
+                    break;
                 case HolesSetterType.Manual:
                     @foreach (var hole in Holes)
                     {
@@ -404,8 +418,15 @@
     {
         Manual,
         Cylinder,
-        EvenlyCylinder
+        EvenlyCylinder,
+        Grid
     }
+
+    /// <summary>Параметры расположения отверстий сеткой (<see cref="HolesSetterType.Grid"/>).</summary>
+    private HoleGrid Grid { get; set; } = new();
+
+    /// <summary>Отверстия в декартовых координатах: введённые вручную или разложенная сетка.</summary>
+    private List<Hole> PlainHoles() => HolesSetter is HolesSetterType.Grid ? Grid.Build() : Holes;
 
     private HolesSetterType HolesSetter { get; set; }
 
@@ -419,6 +440,12 @@
         SelectedCoordinateSystem = CoordinateSystem;
         SetDefaultSpeed();
         if (SequenceToEdit is not null) LoadFromSequence(SequenceToEdit);
+        // отверстия были заданы сеткой — открываем правку снова сеткой, с копией её параметров
+        if (SequenceToEdit is IHoleGridSequence { Grid: { } savedGrid })
+        {
+            Grid = savedGrid.Clone();
+            HolesSetter = HolesSetterType.Grid;
+        }
     }
 
     private void LoadFromSequence(Sequence sequence)
@@ -637,7 +664,7 @@
                                 cutSpeed: TapCutSpeed,
                                 startZ: TapStart,
                                 endZ: TapEnd,
-                                holes: HolesSetter is HolesSetterType.Cylinder or HolesSetterType.EvenlyCylinder ? PolarHoles() : Holes,
+                                holes: HolesSetter is HolesSetterType.Cylinder or HolesSetterType.EvenlyCylinder ? PolarHoles() : PlainHoles(),
                                 polar: HolesSetter is HolesSetterType.Cylinder or HolesSetterType.EvenlyCylinder,
                                 safePlane: SafePlane);
                             return CurrentSequence.Operation;
@@ -659,7 +686,7 @@
                         profStockAllow: ThreadMillingProfStockAllow,
                         exitPlane: ThreadMillingExitPlane,
                         fullCut: ThreadMillingFullCut,
-                        holes: HolesSetter is HolesSetterType.Cylinder or HolesSetterType.EvenlyCylinder ? PolarHoles() : Holes,
+                        holes: HolesSetter is HolesSetterType.Cylinder or HolesSetterType.EvenlyCylinder ? PolarHoles() : PlainHoles(),
                         polar: HolesSetter is HolesSetterType.Cylinder or HolesSetterType.EvenlyCylinder,
                         safePlane: SafePlane);
                     return CurrentSequence.Operation;
@@ -679,7 +706,7 @@
                         profStockAllow: ThreadMillingProfStockAllow,
                         exitPlane: ThreadMillingExitPlane,
                         fullCut: ThreadMillingFullCut,
-                        holes: HolesSetter is HolesSetterType.Cylinder or HolesSetterType.EvenlyCylinder ? PolarHoles() : Holes,
+                        holes: HolesSetter is HolesSetterType.Cylinder or HolesSetterType.EvenlyCylinder ? PolarHoles() : PlainHoles(),
                         polar: HolesSetter is HolesSetterType.Cylinder or HolesSetterType.EvenlyCylinder,
                         safePlane: SafePlane);
                     return CurrentSequence.Operation;
@@ -691,6 +718,8 @@
     private async Task Submit()
     {
         if (CurrentSequence is null) return;
+        if (CurrentSequence is IHoleGridSequence withGrid)
+            withGrid.Grid = HolesSetter is HolesSetterType.Grid ? Grid.Clone() : null;
         await OnSubmit.InvokeAsync(CurrentSequence);
     }
 }

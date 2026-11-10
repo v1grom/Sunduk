@@ -1,0 +1,105 @@
+@inject RoughnessState State
+<MudGrid Spacing="1" Class="pa-2">
+    <MudItem xs="12" md="4">
+        <MudField Label="Утонение стружки" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningDiameter" T="string" Label="Диаметр фрезы"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningWidth" T="string" Label="Ширина резания ae"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningFeed" T="string" Label="Паспортная подача"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм/зуб" Immediate="true" Margin="Margin.Dense" />
+            <MudText Typo="Typo.body2" Class="mt-3 monofield">@ThinningResult</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">
+                При ширине резания меньше половины диаметра стружка тоньше подачи на зуб: hmax = fz·2·√(ae·(D − ae))/D. Чтобы зуб резал, а не тёр, подачу поднимают до паспортной толщины стружки.
+            </MudText>
+        </MudField>
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudField Label="Сферическая фреза: эффективный диаметр" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallDiameter" T="string" Label="Диаметр фрезы"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallDepth" T="string" Label="Глубина резания ap"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallSpeed" T="string" Label="Скорость резания"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="м/мин" Immediate="true" Margin="Margin.Dense" />
+            <MudText Typo="Typo.body2" Class="mt-3 monofield">@BallResult</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">
+                На малой глубине сфера режет диаметром Dэф = 2·√(ap·(D − ap)), а не полным — обороты считаются по нему. Расчёт для фрезы, стоящей перпендикулярно поверхности.
+            </MudText>
+        </MudField>
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudField Label="Сферическая фреза: гребешок" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="ScallopDiameter" T="string" Label="Диаметр фрезы"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" Value="State.ScallopStep" ValueChanged="@((string v) => SetScallop(false, v))" T="string" Label="Шаг между проходами"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" Value="State.ScallopHeight" ValueChanged="@((string v) => SetScallop(true, v))" T="string" Label="Высота гребешка"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
+                Вводится шаг или высота гребешка — второе считается: h = R − √(R² − шаг²/4). Для плоской поверхности; на наклонной стенке гребешок при том же шаге по высоте больше.
+            </MudText>
+        </MudField>
+    </MudItem>
+</MudGrid>
+
+@code
+{
+    string ThinningResult
+    {
+        get
+        {
+            var diameter = Util.GetDouble(State.ThinningDiameter);
+            var width = Util.GetDouble(State.ThinningWidth);
+            var factor = MillingMath.ChipThinningFactor(diameter, width);
+            if (double.IsNaN(factor)) return width > diameter && diameter > 0 ? "Ширина резания больше диаметра фрезы" : "—";
+            if (factor >= 1) return "Утонения нет: ширина от половины диаметра";
+            var feed = Util.GetDouble(State.ThinningFeed);
+            var result = $"Толщина стружки: {Text(factor * 100, 0)}% подачи";
+            return feed > 0 ? $"{result}; подачу можно поднять до {Text(MillingMath.FeedForChipThickness(diameter, width, feed), 3)} мм/зуб" : result;
+        }
+    }
+
+    string BallResult
+    {
+        get
+        {
+            var effective = MillingMath.BallEffectiveDiameter(Util.GetDouble(State.BallDiameter), Util.GetDouble(State.BallDepth));
+            if (double.IsNaN(effective)) return "—";
+            var speed = MillingMath.SpindleSpeed(Util.GetDouble(State.BallSpeed), effective);
+            var result = $"Dэф = {Text(effective, 2)} мм";
+            return double.IsNaN(speed) ? result : $"{result}; обороты {Text(speed, 0)} об/мин";
+        }
+    }
+
+    string ScallopDiameter
+    {
+        get => State.ScallopDiameter;
+        set
+        {
+            State.ScallopDiameter = value;
+            RecalculateScallop();
+        }
+    }
+
+    void SetScallop(bool fromHeight, string value)
+    {
+        State.ScallopFromHeight = fromHeight;
+        if (fromHeight) State.ScallopHeight = value;
+        else State.ScallopStep = value;
+        RecalculateScallop();
+    }
+
+    void RecalculateScallop()
+    {
+        var diameter = Util.GetDouble(State.ScallopDiameter);
+        if (State.ScallopFromHeight)
+            State.ScallopStep = Field(MillingMath.StepForScallop(diameter, Util.GetDouble(State.ScallopHeight) / 1000), 3);
+        else
+            State.ScallopHeight = Field(MillingMath.ScallopHeight(diameter, Util.GetDouble(State.ScallopStep)) * 1000, 1);
+    }
+
+    static string Text(double value, int digits) => Math.Round(value, digits).ToString(CultureInfo.InvariantCulture);
+
+    static string Field(double value, int digits) => double.IsNaN(value) || value <= 0 ? string.Empty : Text(value, digits);
+}

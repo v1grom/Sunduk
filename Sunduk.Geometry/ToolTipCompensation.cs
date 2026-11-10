@@ -191,49 +191,48 @@ namespace Sunduk.Geometry
                 var incomingIsArc = curr is Arc;
                 var outgoingIsArc = next is Arc;
 
-                // Явное скругление на стыке прямая-дуга (торец ИЛИ цилиндр перед дугой) — R/C-адрес
-                // контроллера тут не работает (умеет только прямая-прямая, см. класс-докстринг),
-                // нужна отдельная маленькая дуга сопряжения, как в NippleComponent.GetBluntedShape
-                // (RoundCorner-режим) для торца и Arc2Component.GetBluntedShape для цилиндра.
-                if (hasExplicitBlunt && external && !incomingIsArc && outgoingIsArc && next is Arc arcNext)
+                // Явное притупление (Blunt). Размер, уходящий в G-код, считается здесь же и уже учитывает
+                // радиус пластины: на выпуклом (наружном) угле скругление R + r, на вогнутом R − r
+                // (пластина сама оставляет свой радиус; если R − r ≤ 0 — притупление не пишется), у фаски
+                // так же, но с половиной радиуса пластины. Узел при этом — точка пересечения
+                // скомпенсированных сторон угла (мнимая вершина), а не чертёжная точка.
+                if (hasExplicitBlunt)
                 {
                     var blunt = curr switch { Point p => p.Blunt, Line l => l.Blunt, _ => 0 };
-                    var inDirBlunt = i == 0 ? VirtualFaceDirection : TangentInto(nodes, i);
-                    if (inDirBlunt is not null && IsFaceDirection(inDirBlunt.Value))
-                    {
-                        var blunted = ArcAnchor.Face(curr.Z.Value, arcNext.CenterX, arcNext.CenterZ, arcNext.Radius, blunt, toolRadius);
-                        if (blunted is not null)
-                        {
-                            result.Add(curr switch
-                            {
-                                Point p => new Point(blunted.Value.StartX, curr.Z.Value, 0),
-                                Line l => new Line(blunted.Value.StartX, curr.Z.Value, l.Angle, 0, l.BluntType),
-                                _ => curr,
-                            });
-                            finalizedArcs.Add(result.Count);
-                            result.Add(new Arc(blunted.Value.EndX, blunted.Value.EndZ, blunt + toolRadius, arcNext.Direction, arcNext.CenterX, arcNext.CenterZ));
-                            continue;
-                        }
-                    }
-                    else if (inDirBlunt is not null && IsCylinderDirection(inDirBlunt.Value))
-                    {
-                        var blunted = ArcAnchor.Cylinder(curr.X.Value, arcNext.CenterX, arcNext.CenterZ, arcNext.Radius, blunt, toolRadius);
-                        if (blunted is not null)
-                        {
-                            result.Add(curr switch
-                            {
-                                Point p => new Point(curr.X.Value, blunted.Value.TangentZ, 0),
-                                Line l => new Line(curr.X.Value, blunted.Value.TangentZ, l.Angle, 0, l.BluntType),
-                                _ => curr,
-                            });
-                            finalizedArcs.Add(result.Count);
-                            result.Add(new Arc(blunted.Value.HandoffX, blunted.Value.HandoffZ, blunt + toolRadius, arcNext.Direction, arcNext.CenterX, arcNext.CenterZ));
-                            continue;
-                        }
-                    }
-                }
+                    var bluntType = curr is Line bl ? bl.BluntType : Blunt.Radius;
+                    var prev = i > 0 ? nodes[i - 1] : null;
+                    var prevKnown = prev is null || (prev.X is not null && prev.Z is not null);
+                    var nextKnown = next is not null && next.X is not null && next.Z is not null;
 
-                if (hasExplicitBlunt) { result.Add(curr); continue; } // line-line blunt — обработает BluntSuffix
+                    if (!incomingIsArc && prevKnown && nextKnown && next is Arc arcNext)
+                    {
+                        // прямая-дуга: адрес R/C контроллер тут не умеет — отдельная дуга сопряжения,
+                        // заданная своими начальной и конечной точками
+                        var fillet = LineArcFillet(prev?.X, prev?.Z, curr.X.Value, curr.Z.Value, arcNext.X!.Value, arcNext.Z!.Value,
+                            arcNext.Radius, arcNext.Direction, blunt, toolRadius, external);
+                        if (fillet is { } f)
+                        {
+                            var ox = external ? -toolRadius : toolRadius;
+                            var oz = -toolRadius;
+                            result.Add(WithBlunt(curr, f.StartX + ox, f.StartZ + oz, 0));
+                            finalizedArcs.Add(result.Count);
+                            result.Add(new Arc(f.EndX + ox, f.EndZ + oz, f.Radius, f.Direction, f.CenterX + ox, f.CenterZ + oz));
+                            continue;
+                        }
+                    }
+                    else if (!incomingIsArc && prevKnown && nextKnown)
+                    {
+                        // прямая-прямая: адрес R/C на точке пересечения скомпенсированных сторон
+                        var size = LineCornerBluntSize(prev, curr, next!, blunt, bluntType, toolRadius, external);
+                        var vertex = ExactArcCorner(nodes, i, toolRadius, external);
+                        result.Add(WithBlunt(curr, vertex?.X ?? curr.X.Value, vertex?.Z ?? curr.Z.Value, size));
+                        continue;
+                    }
+
+                    // притупление построить нельзя (последний узел, касательный стык, вогнутый угол с
+                    // радиусом не больше радиуса пластины) — дальше узел считается как острый
+                    curr = WithBlunt(curr, curr.X.Value, curr.Z.Value, 0);
+                }
 
                 // Любой стык (прямая-прямая, прямая-дуга, дуга-дуга): точное пересечение смещённых
                 // кривых (см. ExactArcCorner). Последний узел компенсируется, если в него приходит
@@ -489,6 +488,109 @@ namespace Sunduk.Geometry
                 Arc a => new Arc(x, z, a.Radius, a.Direction, a.CenterX, a.CenterZ),
                 _ => node,
             };
+
+        /// <summary>Узел с новыми координатами и новым размером притупления.</summary>
+        private static Element WithBlunt(Element node, double x, double z, double blunt)
+            => node switch
+            {
+                Point => new Point(x, z, blunt),
+                Line l => new Line(x, z, l.Angle, blunt, l.BluntType),
+                _ => node,
+            };
+
+        /// <summary>Программируемый размер R/C на стыке двух прямых (до узла — прямая из
+        /// <paramref name="prev"/> или мнимый торец, если он null): выпуклый угол — размер плюс радиус
+        /// пластины, вогнутый — минус; у фаски берётся половина радиуса пластины. 0 — притупление не
+        /// пишется (стороны на одной прямой или вогнутое притупление «съедено» радиусом пластины).</summary>
+        private static double LineCornerBluntSize(Element? prev, Element curr, Element next, double blunt, Blunt bluntType, double toolRadius, bool external)
+        {
+            GPoint airNormal;
+            if (prev is null) airNormal = new GPoint(0, 1);
+            else
+            {
+                var dx = curr.X!.Value - prev.X!.Value;
+                var dz = curr.Z!.Value - prev.Z!.Value;
+                if (Math.Sqrt(dx * dx + dz * dz) < Tolerance) return 0;
+                airNormal = AirNormal(dx, dz, external);
+            }
+            var ox = next.X!.Value - curr.X!.Value;
+            var oz = next.Z!.Value - curr.Z!.Value;
+            var length = Math.Sqrt(ox * ox + oz * oz);
+            if (length < Tolerance) return 0;
+            var into = (ox * airNormal.X + oz * airNormal.Z) / length;
+            if (Math.Abs(into) < 1e-6) return 0;
+            var share = bluntType is Blunt.SimpleChamfer ? toolRadius / 2 : toolRadius;
+            var size = into < 0 ? blunt + share : blunt - share;
+            return size > Tolerance ? size : 0;
+        }
+
+        /// <summary>Дуга сопряжения прямая → дуга контура.</summary>
+        public readonly record struct LineArcFilletResult(double StartX, double StartZ, double EndX, double EndZ, double CenterX, double CenterZ, double Radius, Direction Direction);
+
+        /// <summary>
+        /// Скругление радиусом <paramref name="blunt"/> на стыке прямой (приходит в узел из точки
+        /// <paramref name="fromX"/>/<paramref name="fromZ"/>; null — мнимый торец перед первым узлом) и
+        /// дуги контура, начинающейся в узле. Все X — радиусы. Возвращает путь ЦЕНТРА пластины радиуса
+        /// <paramref name="toolRadius"/> по этому скруглению: начало на смещённой прямой, конец на
+        /// смещённой дуге, радиус blunt + r на выпуклом угле и blunt − r на вогнутом. При
+        /// <paramref name="toolRadius"/> = 0 это само чертёжное скругление (для превью и заготовки).
+        /// Центр скругления — пересечение прямой и дуги, смещённых на blunt (в материал у выпуклого
+        /// угла, в воздух у вогнутого). null — стык касательный, скругление не помещается или радиус
+        /// вогнутого скругления не больше радиуса пластины.
+        /// </summary>
+        public static LineArcFilletResult? LineArcFillet(double? fromX, double? fromZ, double x, double z, double arcEndX, double arcEndZ,
+            double arcRadius, Direction arcDirection, double blunt, double toolRadius, bool external)
+        {
+            if (blunt <= Tolerance) return null;
+            if (ArcConstructions.ArcCenter(x, z, arcEndX, arcEndZ, arcRadius, arcDirection) is not { } c) return null;
+
+            double dx, dz;
+            GPoint n;
+            if (fromX is null || fromZ is null)
+            {
+                dx = external ? 1 : -1;
+                dz = 0;
+                n = new GPoint(0, 1);
+            }
+            else
+            {
+                dx = x - fromX.Value;
+                dz = z - fromZ.Value;
+                var len = Math.Sqrt(dx * dx + dz * dz);
+                if (len < Tolerance) return null;
+                dx /= len;
+                dz /= len;
+                n = AirNormal(dx, dz, external);
+            }
+
+            var tangent = Normalize(new GDirection(-(z - c.Z), x - c.X), arcDirection);
+            if (tangent is not { } t) return null;
+            var into = t.X * n.X + t.Z * n.Z;
+            if (Math.Abs(into) < 1e-3) return null; // касательный стык — скруглять нечего
+            var cornerConvex = into < 0;
+            var arcConvex = external ? arcDirection == Direction.CCW : arcDirection == Direction.CW;
+
+            var shift = cornerConvex ? -blunt : blunt; // куда уходит центр скругления: в материал или в воздух
+            var radius = cornerConvex ? blunt + toolRadius : blunt - toolRadius;
+            var locusRadius = arcConvex ? arcRadius + shift : arcRadius - shift;
+            var offsetRadius = arcConvex ? arcRadius + toolRadius : arcRadius - toolRadius;
+            if (radius <= Tolerance || locusRadius <= Tolerance || offsetRadius <= Tolerance) return null;
+
+            var locusLine = new GeoLine(x + shift * n.X, z + shift * n.Z, dx, dz);
+            var center = Nearest(ArcConstructions.IntersectLineCircle(locusLine, new GeoCircle(c.X, c.Z, locusRadius)).Points, new GPoint(x, z));
+            if (center is not { } f) return null;
+            var fx = f.X - c.X;
+            var fz = f.Z - c.Z;
+            var fl = Math.Sqrt(fx * fx + fz * fz);
+            if (fl < Tolerance) return null;
+
+            var k = toolRadius - shift;
+            var cross = dz * t.X - dx * t.Z; // поворот на стыке в плоскости «Z вправо, X вверх»
+            return new LineArcFilletResult(
+                f.X + k * n.X, f.Z + k * n.Z,
+                c.X + offsetRadius * fx / fl, c.Z + offsetRadius * fz / fl,
+                f.X, f.Z, radius, cross > 0 ? Direction.CCW : Direction.CW);
+        }
 
         /// <summary>Вершина мнимой вершины на стыке двух «прямых» направлений (реальные кромки или
         /// касательные дуг): каждая сдвигается вдоль своей нормали n=(dir.Z,-dir.X) на toolRadius,

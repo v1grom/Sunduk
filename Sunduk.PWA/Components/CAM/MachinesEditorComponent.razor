@@ -121,6 +121,8 @@
                                                      ValueChanged="@(v => { machine.LeadingReferentPoint = v; Persist(); })" />
                                         <MudCheckBox T="bool" Value="machine.TrailingReferentPoint" Label="Возврат в референт в конце перехода" Dense="true"
                                                      Class="mt-n3" ValueChanged="@(v => { machine.TrailingReferentPoint = v; Persist(); })" />
+                                        <MudCheckBox T="bool" Value="machine.ModalMotion" Label="Модальный G-код контура: не повторять G0/G1/G2/G3 и неизменные X/Z" Dense="true"
+                                                     Class="mt-n3" ValueChanged="@(v => { machine.ModalMotion = v; Persist(); })" />
                                     </MudItem>
                                     <MudItem xs="12">
                                         <MudTextField T="string" Value="machine.SafetyStringTemplate" Label="Строка безопасности" Variant="Variant.Text" Margin="Margin.Dense"
@@ -293,6 +295,7 @@
             CoolantBlowOffCode = source.CoolantBlowOffCode,
             LeadingReferentPoint = source.LeadingReferentPoint,
             TrailingReferentPoint = source.TrailingReferentPoint,
+            ModalMotion = source.ModalMotion,
             HeaderStyle = source.HeaderStyle,
             HeaderExtraLines = source.HeaderExtraLines,
             HeaderTemplate = source.HeaderTemplate,

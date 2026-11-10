@@ -4,10 +4,13 @@ using System.Collections.Generic;
 
 namespace Sunduk.PWA.Infrastructure.Sequences.Milling
 {
-    public class MillingTappingSequence : TappingSequence
+    public class MillingTappingSequence : TappingSequence, IHoleGridSequence
     {
         public List<Hole> Holes { get; set; }
         public bool Polar { get; set; }
+
+        /// <inheritdoc/>
+        public HoleGrid Grid { get; set; }
         public double SafePlane { get; set; }
         public CoordinateSystem CoordinateSystem { get; set; }
         public override MachineType MachineType => MachineType.Milling;

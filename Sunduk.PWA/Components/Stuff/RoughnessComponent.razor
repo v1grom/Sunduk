@@ -1,0 +1,143 @@
+@inject RoughnessState State
+<MudGrid Spacing="1" Class="pa-2">
+    <MudItem xs="12" sm="6">
+        <MudField Label="Режим" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudGrid Spacing="0">
+                <MudItem xs="12">
+                    <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="InsertRadius" T="string" Label="Радиус пластины"
+                                  InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Class="monofield" Variant="Variant.Text" Value="State.Feed" ValueChanged="@((string v) => Set(RoughnessState.Source.Feed, v))" T="string" Label="Подача"
+                                  InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм/об" Immediate="true" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+        </MudField>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <MudField Label="Шероховатость" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudGrid Spacing="0">
+                <MudItem xs="12">
+                    <MudTextField Class="monofield" Variant="Variant.Text" Value="State.Ra" ValueChanged="@((string v) => Set(RoughnessState.Source.Ra, v))" T="string" Label="Ra"
+                                  InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Class="monofield" Variant="Variant.Text" Value="State.Rz" ValueChanged="@((string v) => Set(RoughnessState.Source.Rz, v))" T="string" Label="Rz"
+                                  InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+        </MudField>
+    </MudItem>
+    @if (Problem is not null)
+    {
+        <MudItem xs="12">
+            <MudAlert Class="rounded-0" Severity="Severity.Warning" Icon="@Icons.Material.Filled.WarningAmber">@Problem</MudAlert>
+        </MudItem>
+    }
+    <MudItem xs="12">
+        <MudField Label="Как считать" Variant="Variant.Filled" Underline="false">
+            <MudText Typo="Typo.body2">Вводится любое из трёх полей — подача, Ra или Rz; два других считаются от него и радиуса пластины.</MudText>
+            <MudText Typo="Typo.body2" Class="mt-2">Расчёт геометрический: высота гребешка, который оставляет радиус пластины, Rz = r − √(r² − f²/4) ≈ f²/8r, и Ra ≈ 0.26·Rz. Это нижняя граница — вибрации, износ, нарост и материал делают реальную поверхность грубее.</MudText>
+            <MudText Typo="Typo.body2" Class="mt-2">Для пластин Wiper расчёт не годится: производители указывают при той же подаче примерно вдвое меньшую Ra.</MudText>
+        </MudField>
+    </MudItem>
+    <MudItem xs="12">
+        <MudField Label="Подача под типовые Ra" Variant="Variant.Filled" Underline="false">
+            <MudSimpleTable Dense="true" Elevation="0" Class="monofield" Style="background: transparent;">
+                <thead>
+                    <tr>
+                        <th>Ra, мкм</th>
+                        @foreach (var r in TableRadii)
+                        {
+                            <th>R@(r.ToString(CultureInfo.InvariantCulture))</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ra in TableRa)
+                    {
+                        <tr>
+                            <td>@ra.ToString(CultureInfo.InvariantCulture)</td>
+                            @foreach (var r in TableRadii)
+                            {
+                                <td>@Roughness.FeedForRa(ra, r).ToString("0.00", CultureInfo.InvariantCulture)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudField>
+    </MudItem>
+</MudGrid>
+
+@code
+{
+    static readonly double[] TableRadii = { 0.2, 0.4, 0.8, 1.2, 1.6 };
+    static readonly double[] TableRa = { 6.3, 3.2, 1.6, 0.8, 0.4 };
+
+    string InsertRadius
+    {
+        get => State.InsertRadius;
+        set
+        {
+            State.InsertRadius = value;
+            Recalculate();
+        }
+    }
+
+    double Radius => Util.GetDouble(State.InsertRadius);
+
+    string? Problem
+    {
+        get
+        {
+            if (Radius <= 0) return "Задайте радиус пластины";
+            return State.Input switch
+            {
+                RoughnessState.Source.Feed when Util.GetDouble(State.Feed) >= 2 * Radius => "Подача не меньше двух радиусов пластины — след радиуса не перекрывается, формула не работает",
+                RoughnessState.Source.Ra when Util.GetDouble(State.Ra) > 0 && string.IsNullOrEmpty(State.Feed) => "Такая шероховатость грубее того, что вообще может оставить этот радиус",
+                RoughnessState.Source.Rz when Util.GetDouble(State.Rz) > 0 && string.IsNullOrEmpty(State.Feed) => "Такая шероховатость грубее того, что вообще может оставить этот радиус",
+                _ => null,
+            };
+        }
+    }
+
+    void Set(RoughnessState.Source source, string value)
+    {
+        State.Input = source;
+        switch (source)
+        {
+            case RoughnessState.Source.Feed: State.Feed = value; break;
+            case RoughnessState.Source.Ra: State.Ra = value; break;
+            default: State.Rz = value; break;
+        }
+        Recalculate();
+    }
+
+    /// <summary>Пересчёт двух полей от того, которое вводил пользователь.</summary>
+    void Recalculate()
+    {
+        var radius = Radius;
+        switch (State.Input)
+        {
+            case RoughnessState.Source.Feed:
+                var feed = Util.GetDouble(State.Feed);
+                State.Rz = Text(Roughness.TheoreticalRz(feed, radius), 2);
+                State.Ra = Text(Roughness.TheoreticalRa(feed, radius), 2);
+                break;
+            case RoughnessState.Source.Ra:
+                var ra = Util.GetDouble(State.Ra);
+                State.Rz = ra > 0 ? Text(ra / Roughness.RaToHeight, 2) : string.Empty;
+                State.Feed = Text(Roughness.FeedForRa(ra, radius), 3);
+                break;
+            default:
+                var rz = Util.GetDouble(State.Rz);
+                State.Ra = rz > 0 ? Text(rz * Roughness.RaToHeight, 2) : string.Empty;
+                State.Feed = Text(Roughness.FeedForRz(rz, radius), 3);
+                break;
+        }
+    }
+
+    static string Text(double value, int digits)
+        => double.IsNaN(value) || value <= 0 ? string.Empty : Math.Round(value, digits).ToString(CultureInfo.InvariantCulture);
+}

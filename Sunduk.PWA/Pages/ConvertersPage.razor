@@ -9,6 +9,12 @@
         <MudTabPanel Text="Координаты точки">
             <PointCoordinatesComponent />
         </MudTabPanel>
+        <MudTabPanel Text="Ra ↔ Rz">
+            <RoughnessConverterComponent />
+        </MudTabPanel>
+        <MudTabPanel Text="Твёрдость">
+            <HardnessConverterComponent />
+        </MudTabPanel>
     </MudTabs>
 </MudSwipeArea>
 
@@ -29,7 +35,7 @@
         }
         else if (args.SwipeDirection == SwipeDirection.RightToLeft)
         {
-            if (tabs.GetState(x => tabs.ActivePanelIndex) < 1)
+            if (tabs.GetState(x => tabs.ActivePanelIndex) < 3)
             {
                 tabs.ActivatePanelAsync(tabs.GetState(x => tabs.ActivePanelIndex) + 1);
             }

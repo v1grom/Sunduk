@@ -116,4 +116,20 @@ public class StartCornerTests
         Assert.Equal(0, first.From.Z, 4);
         Assert.True(first.To.Z < 0);
     }
+
+    [Fact]
+    public void CornerLabels_GoToTheSideOppositeToTheBlunt()
+    {
+        // ступенька наружного контура: выпуклый угол (Ø20, Z0), вогнутый (Ø20, Z-12), выпуклый (Ø32, Z-12)
+        var contour = new List<Element>
+        {
+            new Point(20, 0, 1), new Line(20, -12, 0, 1.5), new Line(32, -12, 0, 1), new Line(32, -25),
+        };
+
+        var corners = TurningToolpath.Build(contour)!.Corners;
+
+        Assert.Equal((1, 1), (corners[0].SideZ, corners[0].SideR));     // выпуклый: подпись справа сверху
+        Assert.Equal((-1, -1), (corners[1].SideZ, corners[1].SideR));   // вогнутый: слева снизу
+        Assert.Equal((1, 1), (corners[2].SideZ, corners[2].SideR));
+    }
 }

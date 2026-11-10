@@ -75,6 +75,7 @@ namespace Sunduk.PWA
             builder.Services.AddSingleton<DrillAngleState>();
             builder.Services.AddSingleton<HoleCapacityState>();
             builder.Services.AddSingleton<RadiusState>();
+            builder.Services.AddSingleton<RoughnessState>();
             builder.Services.AddSingleton<NippleState>();
             builder.Services.AddSingleton<Arc2State>();
             builder.Services.AddSingleton<ArcGeneralState>();

@@ -56,7 +56,7 @@ else
         <MudTextField Label="Чистовая Vc" @bind-Value="SpeedFinish" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
     </MudItem>
     <MudItem xs="12" md="4">
-        <MudTextField Label="Чистовая F" @bind-Value="_FeedFinish" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" />
+        <MudTextField Label="Чистовая F" @bind-Value="_FeedFinish" Variant="Variant.Text" Margin="Margin.Dense" Immediate="true" HelperText="@RoughnessHint" />
     </MudItem>
 }
 <MudItem xs="12">
@@ -122,6 +122,18 @@ else
     private double FacingRoughStockAllow => _FacingRoughStockAllow.GetDouble();
     private string _FacingProfStockAllow { get; set; } = "0.2";
     private double FacingProfStockAllow => _FacingProfStockAllow.GetDouble();
+
+    /// <summary>Расчётная (геометрическая) шероховатость чистового прохода по подаче и радиусу пластины.</summary>
+    private string RoughnessHint
+    {
+        get
+        {
+            if (Tool is not TurningTool { Radius: > 0 } tool || FeedFinish <= 0) return null;
+            var rz = Roughness.TheoreticalRz(FeedFinish, tool.Radius);
+            if (double.IsNaN(rz)) return "Подача не меньше двух радиусов пластины";
+            return $"Расчётная шероховатость: Ra ≈ {Math.Round(rz * Roughness.RaToHeight, 2).ToString(CultureInfo.InvariantCulture)}, Rz ≈ {Math.Round(rz, 1).ToString(CultureInfo.InvariantCulture)} мкм";
+        }
+    }
 
     private Sequence CurrentSequence { get; set; }
 

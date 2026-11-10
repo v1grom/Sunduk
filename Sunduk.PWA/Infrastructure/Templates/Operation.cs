@@ -433,6 +433,7 @@ namespace Sunduk.PWA.Infrastructure.Templates
             if (machine.MachineType != MachineType.Turning) return string.Empty;
             var compensated = ToolTipCompensation.Compensate(contour, tool.Radius, tool.NoseVector);
             var body = new GCodeBuilder().Contour(compensated, feedOnFirstMove: true, feed, tool.Radius, tool.SpindleOn(speed), SafeApproachDistance, tool.NoseVector.IsExternal()).ToString();
+            if (machine.ModalMotion) body = GCodeBuilder.Modal(body);
             return new GCodeBuilder()
                 .ReferentPoint(machine, leading: true)
                 .Transition(tool, machine, coordinateSystem, coolant, body, machineTime, suppressCoolant: machine.LeadingReferentPoint)
@@ -474,7 +475,16 @@ namespace Sunduk.PWA.Infrastructure.Templates
             // отрицательный (материал остаётся со стороны оси) — иначе чистовая сняла бы лишнее.
             var finishAllowance = external ? profStockAllow : -profStockAllow;
 
-            var profile = ProfileBlock(compensated);
+            var profile = ProfileBlock(compensated, external);
+            // последняя строка профиля — всегда возврат по X в точку подвода перед циклом
+            profile.Add($"G1 X{approachX.NC(1)}");
+            if (machine.ModalMotion)
+            {
+                // первый и последний кадры профиля (P/Q) остаются полными: по первому контроллер
+                // определяет тип цикла, а номера кадров вешаются на них ниже
+                var inner = GCodeBuilder.Modal(profile.Take(profile.Count - 1));
+                profile = inner.Take(1).Select(_ => profile[0]).Concat(inner.Skip(1)).Append(profile[^1]).ToList();
+            }
 
             var builder = new GCodeBuilder()
                 .ReferentPoint(machine, leading: true)
@@ -497,9 +507,10 @@ namespace Sunduk.PWA.Infrastructure.Templates
         /// <summary>Профиль P/Q блока цикла G71 — контур как последовательность G1/G2/G3 (X диаметр,
         /// дуги через R). Первая строка — подвод к началу профиля (G1, инструмент уже подведён к
         /// стартовой точке циклом), последующие — перемещения по контуру.</summary>
-        private static List<string> ProfileBlock(List<Element> contour)
+        private static List<string> ProfileBlock(List<Element> contour, bool external)
         {
             var lines = new List<string>();
+            var startApproachX = GCodeBuilder.StartBluntApproachX(contour, external);
             double? prevX = null;
             double? prevZ = null;
             for (var i = 0; i < contour.Count; i++)
@@ -520,7 +531,15 @@ namespace Sunduk.PWA.Infrastructure.Templates
                         continue;
                     }
                 }
-                lines.Add($"G1 X{x.Value.NC()} Z{z.Value.NC()}");
+                var (blunt, bluntType) = e switch
+                {
+                    Point p => (p.Blunt, Blunt.Radius),
+                    Sunduk.Geometry.ContourElements.Line l => (l.Blunt, l.BluntType),
+                    _ => (0d, Blunt.Radius),
+                };
+                // скругление/фаска на первом узле: сначала в начало «мнимой линии» по торцу, затем на узел с R/C
+                if (i == 0 && startApproachX is { } startX) lines.Add($"G1 X{startX.NC()} Z{z.Value.NC()}");
+                lines.Add($"G1 X{x.Value.NC()} Z{z.Value.NC()}{GCodeBuilder.BluntSuffix(blunt, bluntType, i, contour)}");
                 prevX = x; prevZ = z;
             }
             return lines;

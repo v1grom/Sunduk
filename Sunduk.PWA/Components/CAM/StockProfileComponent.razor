@@ -219,7 +219,36 @@
         }
     }
 
-    Infrastructure.StockProfile BeforeProfile => Infrastructure.StockProfile.Build(BaseProgram, BaseProgram.Count, ExternalDiameter, InternalDiameter, FacingAllowance);
+    // Профиль запрашивают полтора десятка построителей путей на каждый рендер, а построение его с
+    // нуля по всей программе — самая тяжёлая часть страницы (в WASM — сотни миллисекунд на контуре
+    // со скруглениями). Поэтому на время одного рендера он строится один раз; вне рендера кэша нет,
+    // чтобы обработчик события не увидел профиль от прежнего состояния программы.
+    bool _rendering;
+    Infrastructure.StockProfile? _beforeCache, _afterCache;
+
+    protected override bool ShouldRender()
+    {
+        _rendering = true;
+        _beforeCache = _afterCache = null;
+        return true;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        _rendering = false;
+        _beforeCache = _afterCache = null;
+    }
+
+    Infrastructure.StockProfile BeforeProfile
+    {
+        get
+        {
+            if (_beforeCache is not null) return _beforeCache;
+            var profile = Infrastructure.StockProfile.Build(BaseProgram, BaseProgram.Count, ExternalDiameter, InternalDiameter, FacingAllowance);
+            if (_rendering) _beforeCache = profile;
+            return profile;
+        }
+    }
 
     /// <summary>Рисуемый профиль: с настраиваемым переходом (если задан) — «после».</summary>
     Infrastructure.StockProfile Profile
@@ -228,8 +257,11 @@
         {
             if (_forced is not null) return _forced;
             if (Candidate is null) return BeforeProfile;
+            if (_afterCache is not null) return _afterCache;
             var program = BaseProgram.Append(Candidate).ToList();
-            return Infrastructure.StockProfile.Build(program, program.Count, ExternalDiameter, InternalDiameter, FacingAllowance);
+            var profile = Infrastructure.StockProfile.Build(program, program.Count, ExternalDiameter, InternalDiameter, FacingAllowance);
+            if (_rendering) _afterCache = profile;
+            return profile;
         }
     }
 
