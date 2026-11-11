@@ -5,6 +5,13 @@ on:
     branches: [master, test]
   workflow_dispatch:
 
+# Два push подряд не должны деплоить параллельно: они делят каталог на сервере,
+# и один запуск стирал архив/файлы другого (сайт оставался пустым).
+# Запуски одной ветки идут по очереди, ничего не отменяется на полпути.
+concurrency:
+  group: deploy-vps-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -33,16 +40,16 @@ jobs:
         if: github.ref == 'refs/heads/master'
         run: |
           tar -czf deploy.tar.gz -C release/wwwroot .
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy.tar.gz root@${{ secrets.VPS_HOST }}:/tmp/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy.tar.gz root@${{ secrets.VPS_HOST }}:/tmp/deploy-${{ github.run_id }}.tar.gz
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@${{ secrets.VPS_HOST }} \
-            "rm -rf /var/www/www.sunduk.one/html/* && tar -xzf /tmp/deploy.tar.gz -C /var/www/www.sunduk.one/html/ && rm /tmp/deploy.tar.gz"
+            "rm -rf /var/www/www.sunduk.one/html/* && tar -xzf /tmp/deploy-${{ github.run_id }}.tar.gz -C /var/www/www.sunduk.one/html/ && rm /tmp/deploy-${{ github.run_id }}.tar.gz"
           rm deploy.tar.gz
 
       - name: Deploy test → test.sunduk.one
         if: github.ref == 'refs/heads/test'
         run: |
           tar -czf deploy.tar.gz -C release/wwwroot .
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy.tar.gz root@${{ secrets.VPS_HOST }}:/tmp/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy.tar.gz root@${{ secrets.VPS_HOST }}:/tmp/deploy-${{ github.run_id }}.tar.gz
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no root@${{ secrets.VPS_HOST }} \
-            "rm -rf /var/www/test.sunduk.one/html/* && tar -xzf /tmp/deploy.tar.gz -C /var/www/test.sunduk.one/html/ && rm /tmp/deploy.tar.gz"
+            "rm -rf /var/www/test.sunduk.one/html/* && tar -xzf /tmp/deploy-${{ github.run_id }}.tar.gz -C /var/www/test.sunduk.one/html/ && rm /tmp/deploy-${{ github.run_id }}.tar.gz"
           rm deploy.tar.gz
