@@ -1,44 +1,18 @@
 ﻿@page "/converters"
-@using MudBlazor.Extensions
 
-<MudSwipeArea OnSwipeEnd="@OnSwipe" Style="touch-action: pan-y;">
-    <MudTabs Elevation="2" @ref="tabs" Style="font-size: small">
-        <MudTabPanel Text="Углы">
-            <AngleConverterComponent />
-        </MudTabPanel>
-        <MudTabPanel Text="Координаты точки">
-            <PointCoordinatesComponent />
-        </MudTabPanel>
-        <MudTabPanel Text="Ra ↔ Rz">
-            <RoughnessConverterComponent />
-        </MudTabPanel>
-        <MudTabPanel Text="Твёрдость">
-            <HardnessConverterComponent />
-        </MudTabPanel>
-    </MudTabs>
-</MudSwipeArea>
+<ChipTabs Titles="titles">
+    <Content Context="i">
+        @switch (i)
+        {
+            case 0: <AngleConverterComponent /> break;
+            case 1: <PointCoordinatesComponent /> break;
+            case 2: <RoughnessConverterComponent /> break;
+            case 3: <HardnessConverterComponent /> break;
+        }
+    </Content>
+</ChipTabs>
 
 @code
 {
-    MudTabs tabs = default!;
-
-    public void OnSwipe(SwipeEventArgs args)
-    {
-        if (args.TouchEventArgs.PointerType != "touch") return;
-
-        if (args.SwipeDirection == SwipeDirection.LeftToRight)
-        {
-            if (tabs.GetState(x => tabs.ActivePanelIndex) > 0)
-            {
-                tabs.ActivatePanelAsync(tabs.GetState(x => tabs.ActivePanelIndex) - 1);
-            }
-        }
-        else if (args.SwipeDirection == SwipeDirection.RightToLeft)
-        {
-            if (tabs.GetState(x => tabs.ActivePanelIndex) < 3)
-            {
-                tabs.ActivatePanelAsync(tabs.GetState(x => tabs.ActivePanelIndex) + 1);
-            }
-        }
-    }
+    static readonly string[] titles = ["Углы", "Координаты точки", "Ra ↔ Rz", "Твёрдость"];
 }

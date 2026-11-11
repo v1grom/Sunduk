@@ -1,0 +1,49 @@
+@using MudBlazor.Extensions
+@* Вкладки в виде сетки чипов с переносом строк: все разделы видны сразу, в отличие от MudTabs с горизонтальной прокруткой *@
+<MudSwipeArea OnSwipeEnd="OnSwipe" Style="touch-action: pan-y;">
+    <div class="d-flex flex-wrap gap-2 px-3 py-2">
+        @for (var i = 0; i < Titles.Count; i++)
+        {
+            var index = i;
+            <MudChip T="string" Size="Size.Medium" Class="ma-0"
+                     Color="@(index == ActiveIndex ? Color.Primary : Color.Default)"
+                     Variant="@(index == ActiveIndex ? Variant.Filled : Variant.Outlined)"
+                     OnClick="() => Select(index)">@Titles[index]</MudChip>
+        }
+    </div>
+    <MudDivider />
+    @Content(ActiveIndex)
+</MudSwipeArea>
+
+@code
+{
+    /// <summary> Заголовки вкладок. </summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> Titles { get; set; } = [];
+
+    /// <summary> Содержимое вкладки по её индексу. </summary>
+    [Parameter, EditorRequired] public RenderFragment<int> Content { get; set; } = default!;
+
+    [Parameter] public int ActiveIndex { get; set; }
+
+    [Parameter] public EventCallback<int> ActiveIndexChanged { get; set; }
+
+    private async Task Select(int index)
+    {
+        if (index == ActiveIndex || index < 0 || index >= Titles.Count) return;
+        ActiveIndex = index;
+        await ActiveIndexChanged.InvokeAsync(index);
+    }
+
+    private Task OnSwipe(SwipeEventArgs args)
+    {
+        // MudSwipeArea реагирует и на мышь: без проверки выделение текста переключало бы вкладку.
+        if (args.TouchEventArgs.PointerType != "touch") return Task.CompletedTask;
+
+        return args.SwipeDirection switch
+        {
+            SwipeDirection.LeftToRight => Select(ActiveIndex - 1),
+            SwipeDirection.RightToLeft => Select(ActiveIndex + 1),
+            _ => Task.CompletedTask
+        };
+    }
+}
