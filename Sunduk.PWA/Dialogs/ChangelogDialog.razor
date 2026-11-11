@@ -63,22 +63,16 @@
         </div>
     </DialogContent>
     <DialogActions>
-        <MudIconButton Icon="@Icons.Custom.Brands.GitHub" Color="Color.Primary" Link="@githubRepoLink"></MudIconButton>
+        <MudIconButton Icon="@Icons.Custom.Brands.GitHub" Color="Color.Primary" Link="@githubRepoLink" Target="_blank" rel="noopener noreferrer"></MudIconButton>
         <MudIconButton Color="Color.Primary" Icon="@Icons.Material.Outlined.Done" OnClick="Submit" />
     </DialogActions>
 </MudDialog>
 @code 
 {
     #region Ссылки
-    private const string wikiPwaLink = @"
-https://ru.wikipedia.org/wiki/%D0%9F%D1%80%D0%BE%D0%B3%D1%80%D0%B5%D1%81%D1%81%D0%B8%D0%B2%D0%BD%D0%BE%D0%B5_%D0%B2%D0%B5%D0%B1-%D0%BF%D1%80%D0%B8%D0%BB%D0%BE%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5
-";
-    private const string msPwaOfflineSupportLink = @"
-https://learn.microsoft.com/ru-ru/aspnet/core/blazor/progressive-web-app?view=aspnetcore-10.0&tabs=visual-studio#offline-support
-";
-    private const string githubRepoLink = @"
-https://github.com/dece1ver/Sunduk
-";
+    private const string wikiPwaLink = "https://ru.wikipedia.org/wiki/%D0%9F%D1%80%D0%BE%D0%B3%D1%80%D0%B5%D1%81%D1%81%D0%B8%D0%B2%D0%BD%D0%BE%D0%B5_%D0%B2%D0%B5%D0%B1-%D0%BF%D1%80%D0%B8%D0%BB%D0%BE%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5";
+    private const string msPwaOfflineSupportLink = "https://learn.microsoft.com/ru-ru/aspnet/core/blazor/progressive-web-app?view=aspnetcore-10.0&tabs=visual-studio#offline-support";
+    private const string githubRepoLink = "https://github.com/v1grom/Sunduk";
     #endregion
 
     public List<ChangelogInfo> Info = new();
