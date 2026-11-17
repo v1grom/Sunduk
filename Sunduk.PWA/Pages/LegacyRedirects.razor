@@ -1,0 +1,21 @@
+@page "/stuff"
+@page "/converters"
+@page "/tolerance"
+@inject NavigationManager Navigation
+@* Старые адреса разделов (закладки, установленные PWA) ведут в новые места *@
+
+@code
+{
+    protected override void OnInitialized()
+    {
+        var path = new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/').ToLowerInvariant();
+        var target = path switch
+        {
+            "/stuff" => NavCatalog.Turning,
+            "/converters" => NavCatalog.Geometry,
+            "/tolerance" => NavCatalog.Material + "/tolerance",
+            _ => "/",
+        };
+        Navigation.NavigateTo(target, replace: true);
+    }
+}

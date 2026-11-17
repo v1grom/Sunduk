@@ -1,15 +1,30 @@
-﻿<MudNavMenu>
-    <MudNavLink Href="/calculator" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Calculate">Калькуляторы</MudNavLink>
-    <MudNavLink Href="/stuff" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.RoundedCorner">Всякая хрень</MudNavLink>
-    <MudNavLink Href="/converters" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Transform">Конвертеры</MudNavLink>
-    <MudNavLink Href="/knowledge/center-length" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.MenuBook">База знаний</MudNavLink>
-    <MudNavLink Href="/timecalc" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Timer">Расчеты времени</MudNavLink>
-    <MudNavLink Href="/dynamic-templates" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.Code">Шаблонник</MudNavLink>
-    <MudNavLink Href="/tolerance" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Straighten">Допуски</MudNavLink>
-    <MudNavLink Href="/sunducam" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Outlined.FeaturedPlayList">SunduCAM</MudNavLink>
+﻿@inject NavigationManager Navigation
+<MudNavMenu>
+    @foreach (var root in NavCatalog.Roots)
+    {
+        var children = NavCatalog.ChildrenOf(root.Href);
+        if (children.Count == 0)
+        {
+            <MudNavLink Href="@root.Href" Match="NavLinkMatch.Prefix" Icon="@root.Icon">@root.Title</MudNavLink>
+        }
+        else
+        {
+            @* Раздел с вкладками: сам раздел открывает первую вкладку, группа раскрыта, когда в ней находится пользователь *@
+            <MudNavGroup Title="@root.Title" Icon="@root.Icon" Expanded="@IsInside(root)">
+                @foreach (var child in children)
+                {
+                    <MudNavLink Href="@child.Href" Match="NavLinkMatch.All" Icon="@child.Icon">@child.Title</MudNavLink>
+                }
+            </MudNavGroup>
+        }
+    }
 </MudNavMenu>
 
 @code {
     [CascadingParameter(Name = "ExperimantalMode")]
     protected bool ExperimantalMode { get; set; }
+
+    private bool IsInside(NavSection root) =>
+        NavCatalog.Find(Navigation.ToBaseRelativePath(Navigation.Uri)) is { } current
+        && (current.Href == root.Href || current.ParentHref == root.Href);
 }

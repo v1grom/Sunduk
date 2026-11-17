@@ -1,0 +1,32 @@
+@inject NavigationManager Navigation
+@* Вкладки раздела из NavCatalog. Активная вкладка задаётся адресом (/milling/high-feed), поэтому на неё можно сослаться и вынести в нижнюю панель *@
+<TabStrip Titles="_titles" ActiveIndex="_active" ActiveIndexChanged="Go">
+    <Content Context="i">
+        @Content(_tabs[i].Key)
+    </Content>
+</TabStrip>
+
+@code
+{
+    /// <summary> Адрес раздела, например «/milling». </summary>
+    [Parameter, EditorRequired] public string Section { get; set; } = string.Empty;
+
+    /// <summary> Ключ вкладки из адреса; без него открывается первая. </summary>
+    [Parameter] public string? Tab { get; set; }
+
+    /// <summary> Содержимое вкладки по её ключу. </summary>
+    [Parameter, EditorRequired] public RenderFragment<string> Content { get; set; } = default!;
+
+    private IReadOnlyList<NavSection> _tabs = [];
+    private IReadOnlyList<string> _titles = [];
+    private int _active;
+
+    protected override void OnParametersSet()
+    {
+        _tabs = NavCatalog.ChildrenOf(Section);
+        _titles = _tabs.Select(t => t.Title).ToList();
+        _active = Math.Max(0, _tabs.ToList().FindIndex(t => t.Key.Equals(Tab, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private void Go(int index) => Navigation.NavigateTo(_tabs[index].Href);
+}

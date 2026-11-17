@@ -30,6 +30,9 @@
         {
             <MudText Typo="Typo.caption">@Breakpoint</MudText>
         }
+        <MudTooltip Text="Калькулятор" Placement="Placement.Start">
+            <MudIconButton Icon="@Icons.Material.Filled.Calculate" @onclick="OpenCalculatorDialogAsync" Color="Color.Inherit" />
+        </MudTooltip>
         <MudTooltip Text="Параметры" Placement="Placement.Start">
             <MudIconButton Icon="@Icons.Material.Filled.Settings" @onclick="OpenSettingsDialogAsync" Color="Color.Inherit" />
         </MudTooltip>
@@ -58,9 +61,9 @@
     <nav class="bottom-nav" aria-label="Основные разделы">
         @foreach (var section in _bottomSections)
         {
-            <NavLink class="bottom-nav-item" href="@section.Href" Match="NavLinkMatch.Prefix">
-                <MudIcon Icon="@section.Icon" /><span>@section.Title</span>
-            </NavLink>
+            <a class="@($"bottom-nav-item{(IsActive(section) ? " active" : "")}")" href="@section.Href">
+                <MudIcon Icon="@section.Icon" /><span>@section.ShortTitle</span>
+            </a>
         }
         <button type="button" class="bottom-nav-item" @onclick="DrawerToggle">
             <MudIcon Icon="@Icons.Material.Filled.Apps" /><span>Ещё</span>
@@ -83,7 +86,25 @@
 
     // Набор разделов в нижней панели считается один раз при запуске: порядок не должен
     // перескакивать на глазах, иначе пропадает мышечная память.
-    private IReadOnlyList<NavSection> _bottomSections = NavUsage.Sections.Take(NavUsage.Slots).ToList();
+    private IReadOnlyList<NavSection> _bottomSections = NavCatalog.Resolve(NavCatalog.DefaultSlots);
+
+    /// <summary>
+    /// Подсвечивается тот пункт панели, чей адрес длиннее всего совпадает с текущим: если в панели и раздел,
+    /// и его вкладка, раздел не горит вместе с вкладкой.
+    /// </summary>
+    private bool IsActive(NavSection section)
+    {
+        var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+        bool Matches(NavSection s) => path.Equals(s.Href, StringComparison.OrdinalIgnoreCase)
+                                   || path.StartsWith(s.Href + "/", StringComparison.OrdinalIgnoreCase);
+        // Раздел без указанной вкладки (/milling) открывает первую: она тоже считается текущей
+        if (!Matches(section))
+        {
+            return false;
+        }
+        var deeper = _bottomSections.Any(s => s != section && s.Href.Length > section.Href.Length && Matches(s));
+        return !deeper;
+    }
 
     protected override void OnInitialized()
     {
@@ -96,9 +117,12 @@
     private static void UpdateFormatContext(string relativePath) =>
         ResultFormats.IsCam = relativePath.StartsWith("sunducam", StringComparison.OrdinalIgnoreCase);
 
-    private void UpdateBottomSections() => _bottomSections = Settings.NavOrder == NavOrderMode.ByUsage
-        ? NavUsage.Top()
-        : NavUsage.Sections.Take(NavUsage.Slots).ToList();
+    private void UpdateBottomSections() => _bottomSections = Settings.NavOrder switch
+    {
+        NavOrderMode.ByUsage => NavUsage.Top(),
+        NavOrderMode.Custom => NavCatalog.Resolve(Settings.NavSlots),
+        _ => NavCatalog.Resolve(NavCatalog.DefaultSlots),
+    };
 
     private void OnSettingsChanged()
     {
@@ -114,6 +138,8 @@
         UpdateFormatContext(relativePath);
         _ = NavUsage.RecordAsync(relativePath);
         _ = Analytics.PageAsync(relativePath);
+        // Подсветка пункта нижней панели зависит от адреса
+        InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()
@@ -159,6 +185,17 @@
             FullWidth = true
         };
         return DialogService.ShowAsync<SettingsDialog>("Параметры", options);
+    }
+
+    private Task OpenCalculatorDialogAsync()
+    {
+        var options = new DialogOptions() {
+            CloseButton = true,
+            CloseOnEscapeKey = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true
+        };
+        return DialogService.ShowAsync<CalculatorDialog>("Калькулятор", options);
     }
 
     private Task OpenQrDialogAsync()

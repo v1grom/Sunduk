@@ -186,9 +186,6 @@
 
 
 
-    private const string RadianToDegreeFunction = "Deg";
-    private const string DegreeToRadianFunction = "Rad";
-
     // Ссылки на поля ввода
     private MudTextField<string>? diameterField;
     private MudTextField<string>? edgesField;
@@ -200,14 +197,6 @@
     private MudTextField<string>? activeField;
 
     private bool _preventDefault;
-
-    enum TrigonometricFunction
-    {
-        Sin,
-        Cos,
-        Tan,
-        Atan
-    }
 
     #region Диаметр
 
@@ -560,104 +549,33 @@
 
     void CalculateTrigonometricFunction(TrigonometricFunction function)
     {
-        if (!double.TryParse(UserExpression
-            .TrimStart("Sin(")
-            .TrimStart("Cos(")
-            .TrimStart("Tan(")
-            .TrimStart("Atan(")
-            .TrimEnd(')')
-            .Replace(".", ","), out var userExpr))
+        if (ExpressionCalculator.TryApplyTrigonometric(function, UserExpression, out var expression, out var answer))
+        {
+            UserExpression = expression;
+            Answer = answer;
+        }
+        else
         {
             UserExpression = "";
             Answer = "";
-            return;
-        }
-        switch (function)
-        {
-            case TrigonometricFunction.Sin:
-                UserExpression = $"Sin({userExpr})".Replace(',', '.');
-                Answer = Math.Sin(userExpr.Radians()).ToPrettyString(stringOption: Util.PrettyStringOption.AsIs);
-                break;
-            case TrigonometricFunction.Cos:
-                UserExpression = $"Cos({userExpr})".Replace(',', '.');
-                Answer = Math.Cos(userExpr.Radians()).ToPrettyString(stringOption: Util.PrettyStringOption.AsIs);
-                break;
-            case TrigonometricFunction.Tan:
-                UserExpression = $"Tan({userExpr})".Replace(',', '.');
-                Answer = Math.Tan(userExpr.Radians()).ToPrettyString(stringOption: Util.PrettyStringOption.AsIs);
-                break;
-            case TrigonometricFunction.Atan:
-                UserExpression = $"Atan({userExpr})".Replace(',', '.');
-                Answer = Math.Atan(userExpr).Degrees().ToPrettyString(stringOption: Util.PrettyStringOption.AsIs);
-                break;
-            default:
-                break;
         }
     }
 
     void Calculate()
     {
-        List<string> calcErrors = new();
-        try
+        if (!ExpressionCalculator.TryEvaluate(UserExpression, out var result, out var error))
         {
-            var userExpr = UserExpression.Trim().Replace("𝜋", Math.PI.ToString()).Replace("²", "**2").Replace("^", "**").Replace(',', '.');
-            var expr = new Expression(userExpr, ExpressionOptions.IgnoreCaseAtBuiltInFunctions | ExpressionOptions.CaseInsensitiveStringComparer);
-            expr.Functions[DegreeToRadianFunction] = (args) =>
-                {
-                    if (args.Count() > 1) Util.ThrowLogged<ArgumentOutOfRangeException>($"Слишком много аргументов для функции {DegreeToRadianFunction}", calcErrors);
-                    double d = args.Evaluate(0) switch
-                    {
-                        double dd => dd,
-                        int ii => ii,
-                        long ll => ll,
-                        string ss => Util.ToDouble(ss.Replace(',', '.')),
-                        _ => throw new ArgumentException($"Неподдерживаемый тип: {args?.GetType()}")
-                    };
-                    return d * Math.PI / 180;
-                };
-
-            expr.Functions[RadianToDegreeFunction] = (args) =>
-            {
-                if (args.Count() > 1) Util.ThrowLogged<ArgumentOutOfRangeException>($"Слишком много аргументов для функции {RadianToDegreeFunction}", calcErrors);
-                double d = args.Evaluate(0) switch
-                {
-                    double dd => dd,
-                    int ii => ii,
-                    long ll => ll,
-                    string ss => Util.ToDouble(ss.Replace(',', '.')),
-                    _ => Util.ThrowLogged<ArgumentException>($"Неподдерживаемый тип: {args?.GetType()}", calcErrors),
-                };
-                return d * 180 / Math.PI;
-            };
-            if (expr.HasErrors())
-            {
-                Snackbar.Add(expr.Error.Message);
-                return;
-            }
-            var r = expr.Evaluate();
-            if (r is null)
-            {
-                Snackbar.Add("Не удалось вычислить");
-                return;
-            }
-            var result = r is double d ? d.ToPrettyString(stringOption: Util.PrettyStringOption.AsIs) :
-                         r is int i ? i.ToString() :
-                         r is long l ? l.ToString() :
-                         r?.ToString() ?? "[?]";
-            if (SetResultToExpression)
-            {
-                UserExpression = result;
-            }
-            Answer = result;
-            activeField = exprField;
-            StateHasChanged();
-            _ = SetCursorToEnd();
+            Snackbar.Add(error);
             return;
         }
-        catch
+        if (SetResultToExpression)
         {
-            Snackbar.Add($"Ошибки при вычислении: {string.Join(", ", calcErrors)}");
+            UserExpression = result;
         }
+        Answer = result;
+        activeField = exprField;
+        StateHasChanged();
+        _ = SetCursorToEnd();
     }
 
     private async Task SetCursorToEnd()

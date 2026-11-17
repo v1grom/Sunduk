@@ -1,0 +1,13 @@
+@page "/milling"
+@page "/milling/{Tab}"
+
+<SectionTabs Section="@NavCatalog.Milling" Tab="@Tab">
+    <Content Context="key">
+        <MillingComponent Part="@key" />
+    </Content>
+</SectionTabs>
+
+@code
+{
+    [Parameter] public string? Tab { get; set; }
+}

@@ -28,6 +28,29 @@ namespace Sunduk.PWA.Infrastructure
             => chipThickness / ChipThinningFactor(diameter, width);
 
         /// <summary>
+        /// Наибольшая толщина стружки фрезы с малым углом в плане (high feed), мм: fz·sin κ,
+        /// а при ширине резания меньше половины диаметра ещё и с радиальным утонением.
+        /// NaN при некорректных данных.
+        /// </summary>
+        public static double HighFeedChipThickness(double diameter, double width, double leadAngle, double feedPerTooth)
+        {
+            if (leadAngle <= 0 || leadAngle > 90 || feedPerTooth <= 0) return double.NaN;
+            var radial = width > 0 ? ChipThinningFactor(diameter, width) : 1;
+            return double.IsNaN(radial) ? double.NaN : feedPerTooth * Math.Sin(leadAngle * Math.PI / 180) * radial;
+        }
+
+        /// <summary>
+        /// Подача на зуб high feed фрезы, мм, дающая ту же толщину стружки, что паспортная подача
+        /// при полной ширине резания: паспортная / радиальное утонение (угол в плане уже учтён в паспорте).
+        /// </summary>
+        public static double HighFeedCorrectedFeed(double diameter, double width, double catalogFeed)
+        {
+            if (catalogFeed <= 0) return double.NaN;
+            var radial = width > 0 ? ChipThinningFactor(diameter, width) : 1;
+            return double.IsNaN(radial) ? double.NaN : catalogFeed / radial;
+        }
+
+        /// <summary>
         /// Диаметр, которым реально режет сферическая фреза при глубине <paramref name="depth"/>:
         /// 2·√(ap·(D − ap)); от половины диаметра и глубже — полный диаметр.
         /// </summary>

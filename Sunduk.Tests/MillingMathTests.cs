@@ -24,6 +24,17 @@ public class MillingMathTests
     }
 
     [Fact]
+    public void HighFeed_ChipThicknessFollowsLeadAngle()
+    {
+        // κ 15°, полная ширина: fz·sin15°
+        Assert.Equal(1.5 * Math.Sin(15 * Math.PI / 180), MillingMath.HighFeedChipThickness(32, 32, 15, 1.5), 6);
+        // D10, ae 1: ещё ×0.6; подача поднимается в 1/0.6
+        Assert.Equal(1 * Math.Sin(15 * Math.PI / 180) * 0.6, MillingMath.HighFeedChipThickness(10, 1, 15, 1), 6);
+        Assert.Equal(1 / 0.6, MillingMath.HighFeedCorrectedFeed(10, 1, 1), 6);
+        Assert.True(double.IsNaN(MillingMath.HighFeedChipThickness(10, 1, 0, 1)));
+    }
+
+    [Fact]
     public void BallEffectiveDiameter_ShallowCut()
     {
         // D10, ap 1: 2·√(1·9) = 6

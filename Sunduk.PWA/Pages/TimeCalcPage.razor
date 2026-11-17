@@ -1,0 +1,17 @@
+@page "/timecalc"
+@page "/timecalc/{Tab}"
+
+<SectionTabs Section="@NavCatalog.TimeCalc" Tab="@Tab">
+    <Content Context="key">
+        @switch (key)
+        {
+            case "turning": <TurningTimeComponent /> break;
+            case "sawing": <SawingTimeComponent /> break;
+        }
+    </Content>
+</SectionTabs>
+
+@code
+{
+    [Parameter] public string? Tab { get; set; }
+}

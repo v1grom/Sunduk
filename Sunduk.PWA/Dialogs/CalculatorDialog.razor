@@ -1,0 +1,211 @@
+@inject CalculatorPageState State
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject IJSRuntime Js
+@inject ISnackbar Snackbar
+@* Калькулятор выражений, доступный с любой страницы из верхней панели. Выражение и ответ общие со страницей «Режимы». *@
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudTextField @ref="_exprField" Class="monofield" InputId="@ExpressionId" Margin="Margin.Dense" Variant="Variant.Text" Label="Выражение"
+                          @bind-Value="Expression" InputMode="@_inputMode" OnKeyDown="HandleKeyDown" KeyDownPreventDefault="@_preventDefault" Immediate="true" />
+            <MudTextField Class="monofield" Margin="Margin.Dense" Variant="Variant.Text" Label="Результат" Value="State.Answer" ReadOnly="true" />
+
+            <div class="calculator-keys">
+                @foreach (var key in Keys)
+                {
+                    <MudButton Class="@key.CssClass" Variant="Variant.Filled" Color="@(key.Kind == KeyKind.Equals ? Color.Primary : Color.Default)"
+                               OnClick="key.OnClick" aria-label="@(key.Kind == KeyKind.Keyboard ? KeyboardAriaLabel : key.AriaLabel)">
+                        @if (key.Kind == KeyKind.Keyboard)
+                        {
+                            <MudIcon Icon="@(_inputMode == InputMode.@decimal ? Icons.Material.Filled.KeyboardHide : Icons.Material.Filled.Keyboard)" />
+                        }
+                        else
+                        {
+                            @key.Label
+                        }
+                    </MudButton>
+                }
+            </div>
+
+            <MudChipSet T="bool" Class="calculator-chip-set" CheckMark SelectionMode="@SelectionMode.ToggleSelection" @bind-SelectedValue="SetResultToExpression">
+                <MudChip Value="true" Text="Перенос результата в выражение" />
+            </MudChipSet>
+        </MudStack>
+    </DialogContent>
+</MudDialog>
+
+@code
+{
+    private const string ExpressionId = "calculator-dialog-expression";
+
+    private MudTextField<string>? _exprField;
+    private InputMode _inputMode = InputMode.@decimal;
+    private bool _setResultToExpression;
+    private bool _preventDefault;
+
+    private string Expression
+    {
+        get => State.UserExpression;
+        set => State.UserExpression = value;
+    }
+
+    private bool SetResultToExpression
+    {
+        get => _setResultToExpression;
+        set
+        {
+            _setResultToExpression = value;
+            _ = LocalStorage.SetItemAsync(nameof(SetResultToExpression), value);
+        }
+    }
+
+    private List<CalcKey> Keys { get; set; } = new();
+
+    private string KeyboardAriaLabel => _inputMode == InputMode.@decimal ? "Скрыть системную клавиатуру" : "Показать системную клавиатуру";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Те же ключи LocalStorage, что у страницы «Режимы»: настройки клавиатуры и переноса общие
+        try
+        {
+            _inputMode = await LocalStorage.GetItemAsync<InputMode?>(nameof(InputMode)) ?? InputMode.@decimal;
+            _setResultToExpression = await LocalStorage.GetItemAsync<bool>(nameof(SetResultToExpression));
+        }
+        catch
+        {
+            // Хранилище недоступно: остаются значения по умолчанию
+        }
+        Keys = BuildKeys();
+    }
+
+    #region Экранная клавиатура
+
+    private enum KeyKind { Function, Operator, Number, Clear, Equals, Keyboard }
+
+    private sealed record CalcKey(string Label, KeyKind Kind, EventCallback<MouseEventArgs> OnClick, string? AriaLabel = null)
+    {
+        public string CssClass => Kind switch
+        {
+            KeyKind.Number or KeyKind.Keyboard => "calculator-key calculator-key-num",
+            KeyKind.Equals => "calculator-key calculator-key-eq",
+            _ => "calculator-key",
+        };
+    }
+
+    private EventCallback<MouseEventArgs> Cb(Func<Task> action) => EventCallback.Factory.Create<MouseEventArgs>(this, action);
+    private EventCallback<MouseEventArgs> Cb(Action action) => EventCallback.Factory.Create<MouseEventArgs>(this, action);
+
+    private CalcKey Insert(string label, string text, KeyKind kind = KeyKind.Operator, string? aria = null) =>
+        new(label, kind, Cb(() => AddToExpressionAsync(text)), aria);
+
+    private CalcKey Trig(string label, TrigonometricFunction function) =>
+        new(label, KeyKind.Function, Cb(() => ApplyTrigonometric(function)));
+
+    private List<CalcKey> BuildKeys() => new()
+    {
+        Trig("Sin", TrigonometricFunction.Sin), Insert("X²", "²", KeyKind.Function), Insert("÷", "/", aria: "Разделить"), Insert("×", "*", aria: "Умножить"),
+        new("C", KeyKind.Clear, Cb(Clear), "Очистить"), new("⌫", KeyKind.Clear, Cb(EraseLeftAsync), "Удалить символ"),
+
+        Trig("Cos", TrigonometricFunction.Cos), Insert("√X", "Sqrt(", KeyKind.Function, "Квадратный корень"), Insert("7", "7", KeyKind.Number), Insert("8", "8", KeyKind.Number),
+        Insert("9", "9", KeyKind.Number), Insert("−", "-", aria: "Минус"),
+
+        Trig("Tan", TrigonometricFunction.Tan), Insert("Xⁿ", "^", KeyKind.Function, "Степень"), Insert("4", "4", KeyKind.Number), Insert("5", "5", KeyKind.Number),
+        Insert("6", "6", KeyKind.Number), Insert("+", "+", aria: "Плюс"),
+
+        Trig("Atan", TrigonometricFunction.Atan), Insert("𝜋", "𝜋", KeyKind.Function, "Число пи"), Insert("1", "1", KeyKind.Number), Insert("2", "2", KeyKind.Number),
+        Insert("3", "3", KeyKind.Number), Insert("%", "%"),
+
+        Insert("(", "("), Insert(")", ")"), new("", KeyKind.Keyboard, Cb(ToggleKeyboard)), Insert("0", "0", KeyKind.Number), Insert(".", ".", KeyKind.Number, "Десятичная точка"),
+        new("=", KeyKind.Equals, Cb(Calculate), "Вычислить"),
+    };
+
+    #endregion
+
+    private void ToggleKeyboard()
+    {
+        _inputMode = _inputMode == InputMode.@decimal ? InputMode.none : InputMode.@decimal;
+        _ = LocalStorage.SetItemAsync(nameof(InputMode), _inputMode);
+    }
+
+    private async Task<(int Start, int End)> SelectionAsync()
+    {
+        var range = await Js.InvokeAsync<int[]>("sundukInput.selection", ExpressionId);
+        var length = Expression.Length;
+        return (Math.Clamp(range[0], 0, length), Math.Clamp(range[1], 0, length));
+    }
+
+    private async Task SetTextAsync(string value, int cursor)
+    {
+        Expression = value;
+        StateHasChanged();
+        await Task.Delay(10);
+        if (_exprField?.InputReference is { } input) await input.SelectRangeAsync(cursor, cursor);
+    }
+
+    private async Task AddToExpressionAsync(string text)
+    {
+        var (start, end) = await SelectionAsync();
+        await SetTextAsync(Expression[..start] + text + Expression[end..], start + text.Length);
+    }
+
+    private async Task EraseLeftAsync()
+    {
+        var (start, end) = await SelectionAsync();
+        if (start != end) await SetTextAsync(Expression[..start] + Expression[end..], start);
+        else if (start > 0) await SetTextAsync(Expression[..(start - 1)] + Expression[start..], start - 1);
+    }
+
+    private void Clear()
+    {
+        Expression = string.Empty;
+        State.Answer = string.Empty;
+    }
+
+    private void ApplyTrigonometric(TrigonometricFunction function)
+    {
+        if (ExpressionCalculator.TryApplyTrigonometric(function, Expression, out var expression, out var answer))
+        {
+            Expression = expression;
+            State.Answer = answer;
+        }
+        else
+        {
+            Clear();
+        }
+    }
+
+    private void Calculate()
+    {
+        if (!ExpressionCalculator.TryEvaluate(Expression, out var result, out var error))
+        {
+            Snackbar.Add(error);
+            return;
+        }
+        if (SetResultToExpression) Expression = result;
+        State.Answer = result;
+        StateHasChanged();
+        _ = FocusEndAsync();
+    }
+
+    private async Task FocusEndAsync()
+    {
+        if (_exprField?.InputReference is not { } input) return;
+        await Task.Delay(50);
+        try
+        {
+            await input.FocusAsync();
+            await input.SelectRangeAsync(Expression.Length, Expression.Length);
+        }
+        catch
+        {
+            // Диалог мог закрыться за время ожидания
+        }
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        _preventDefault = e.Key == "Enter";
+        if (_preventDefault) Calculate();
+    }
+}

@@ -3,43 +3,23 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Blazored.LocalStorage;
-using MudBlazor;
 
 namespace Sunduk.PWA.Infrastructure.State
 {
-    /// <summary> Раздел, который может оказаться в нижней панели навигации. </summary>
-    public record NavSection(string Href, string Title, string Icon);
-
     /// <summary>
-    /// Счётчик заходов в разделы. По нему нижняя панель на телефоне подбирает самые частые
-    /// разделы пользователя. Данные хранятся только в LocalStorage этого устройства.
+    /// Счётчик заходов в разделы и их вкладки. По нему нижняя панель в режиме «по использованию»
+    /// подбирает самые частые пункты пользователя. Данные хранятся только в LocalStorage этого устройства.
     /// </summary>
     public class NavUsage
     {
         private const string StorageKey = "nav-usage";
 
-        /// <summary> Сколько раз нужно зайти в раздел, чтобы он начал влиять на порядок. </summary>
+        /// <summary> Сколько раз нужно зайти в пункт, чтобы он начал влиять на порядок. </summary>
         private const int MinVisitsToChange = 3;
-
-        /// <summary> Сколько разделов показывается в панели (ещё одна кнопка «Ещё» есть всегда). </summary>
-        public const int Slots = 4;
-
-        /// <summary> Все разделы. Первые <see cref="Slots"/> — набор по умолчанию, в нужном порядке. </summary>
-        public static readonly IReadOnlyList<NavSection> Sections = new NavSection[]
-        {
-            new("/calculator", "Режимы", Icons.Material.Filled.Calculate),
-            new("/stuff", "Хрень", Icons.Material.Filled.RoundedCorner),
-            new("/tolerance", "Допуски", Icons.Material.Filled.Straighten),
-            new("/knowledge", "База", Icons.Material.Filled.MenuBook),
-            new("/converters", "Конверт.", Icons.Material.Filled.Transform),
-            new("/timecalc", "Время", Icons.Material.Filled.Timer),
-            new("/dynamic-templates", "Шаблоны", Icons.Material.Outlined.Code),
-            new("/sunducam", "CAM", Icons.Material.Outlined.FeaturedPlayList),
-        };
 
         private readonly ILocalStorageService _storage;
         private Dictionary<string, int> _visits = new();
-        private string? _lastSection;
+        private string? _lastHref;
 
         public NavUsage(ILocalStorageService storage) => _storage = storage;
 
@@ -55,20 +35,12 @@ namespace Sunduk.PWA.Infrastructure.State
             }
         }
 
-        /// <summary> Находит раздел по относительному пути (например, «knowledge/formulas»). </summary>
-        public static NavSection? Find(string relativePath)
-        {
-            var path = "/" + relativePath.Split('?', '#')[0].TrimStart('/');
-            return Sections.FirstOrDefault(s => path.Equals(s.Href, StringComparison.OrdinalIgnoreCase)
-                                             || path.StartsWith(s.Href + "/", StringComparison.OrdinalIgnoreCase));
-        }
-
-        /// <summary> Засчитывает заход. Переходы внутри одного раздела (вкладки, статьи) считаются одним заходом. </summary>
+        /// <summary> Засчитывает заход в самый глубокий пункт, которому принадлежит путь. Повторная загрузка того же пункта не считается. </summary>
         public async Task RecordAsync(string relativePath)
         {
-            var section = Find(relativePath);
-            if (section is null || section.Href == _lastSection) return;
-            _lastSection = section.Href;
+            var section = NavCatalog.Find(relativePath);
+            if (section is null || section.Href == _lastHref) return;
+            _lastHref = section.Href;
 
             _visits[section.Href] = _visits.GetValueOrDefault(section.Href) + 1;
             try
@@ -82,9 +54,9 @@ namespace Sunduk.PWA.Infrastructure.State
         }
 
         /// <summary>
-        /// Разделы для панели: по убыванию заходов, при равенстве — в порядке по умолчанию.
-        /// Раздел учитывается, только если зашли в него не меньше <see cref="MinVisitsToChange"/> раз,
-        /// чтобы случайные переходы не меняли панель: до этого остаётся порядок по умолчанию.
+        /// Пункты для панели: по убыванию заходов, при равенстве — сначала набор по умолчанию, затем остальные.
+        /// Пункт учитывается, только если зашли в него не меньше <see cref="MinVisitsToChange"/> раз,
+        /// чтобы случайные переходы не меняли панель.
         /// </summary>
         public IReadOnlyList<NavSection> Top()
         {
@@ -94,11 +66,14 @@ namespace Sunduk.PWA.Infrastructure.State
                 return visits >= MinVisitsToChange ? visits : 0;
             }
 
-            return Sections
+            var ordered = NavCatalog.Resolve(NavCatalog.DefaultSlots)
+                .Concat(NavCatalog.All.Where(s => !NavCatalog.DefaultSlots.Contains(s.Href)));
+
+            return ordered
                 .Select((s, i) => (Section: s, Index: i, Score: Score(s)))
                 .OrderByDescending(x => x.Score)
                 .ThenBy(x => x.Index)
-                .Take(Slots)
+                .Take(NavCatalog.Slots)
                 .Select(x => x.Section)
                 .ToList();
         }

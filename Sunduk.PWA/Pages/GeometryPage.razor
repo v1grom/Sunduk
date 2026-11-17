@@ -1,0 +1,20 @@
+@page "/geometry"
+@page "/geometry/{Tab}"
+
+<SectionTabs Section="@NavCatalog.Geometry" Tab="@Tab">
+    <Content Context="key">
+        @switch (key)
+        {
+            case "chamfer": <ChamferComponent /> break;
+            case "arcs": <ArcsComponent /> break;
+            case "drill-angle": <DrillAngleComponent /> break;
+            case "point": <PointCoordinatesComponent /> break;
+            case "angles": <AngleConverterComponent /> break;
+        }
+    </Content>
+</SectionTabs>
+
+@code
+{
+    [Parameter] public string? Tab { get; set; }
+}

@@ -1,7 +1,9 @@
 @inject RoughnessState State
 <MudGrid Spacing="1" Class="pa-2">
-    <MudItem xs="12" md="4">
-        <MudField Label="Утонение стружки" Variant="Variant.Filled" Underline="false" Class="mt-1">
+    @if (Part == "chip-thinning")
+    {
+    <MudItem xs="12" md="6" lg="4">
+        <MudField Label="Утонение стружки"Variant="Variant.Filled" Underline="false" Class="mt-1">
             <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningDiameter" T="string" Label="Диаметр фрезы"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
             <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningWidth" T="string" Label="Ширина резания ae"
@@ -14,8 +16,34 @@
             </MudText>
         </MudField>
     </MudItem>
-    <MudItem xs="12" md="4">
-        <MudField Label="Сферическая фреза: эффективный диаметр" Variant="Variant.Filled" Underline="false" Class="mt-1">
+    }
+    @if (Part == "high-feed")
+    {
+    <MudItem xs="12" md="6" lg="4">
+        <MudField Label="High feed: подача"Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedDiameter" T="string" Label="Диаметр фрезы"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedWidth" T="string" Label="Ширина резания ae"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedAngle" T="string" Label="Угол в плане κ"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="°" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedFz" T="string" Label="Паспортная подача"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм/зуб" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedTeeth" T="string" Label="Число зубьев"
+                          InputMode="@(InputMode.@numeric)" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedSpeed" T="string" Label="Обороты"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="об/мин" Immediate="true" Margin="Margin.Dense" />
+            <MudText Typo="Typo.body2" Class="mt-3 monofield" Style="white-space: pre-line;">@HighFeedResult</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">
+                У фрез с малым углом в плане стружка тоньше подачи на зуб: hmax = fz·sin κ (при 15° — около 26%), поэтому паспортные подачи большие. Паспортная подача уже учитывает угол, при малой ae её поднимают ещё и на радиальное утонение. Для круглых пластин угол в плане меняется с глубиной — там сверяйтесь с каталогом.
+            </MudText>
+        </MudField>
+    </MudItem>
+    }
+    @if (Part == "ball")
+    {
+    <MudItem xs="12" md="6" lg="4">
+        <MudField Label="Сферическая фреза: эффективный диаметр"Variant="Variant.Filled" Underline="false" Class="mt-1">
             <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallDiameter" T="string" Label="Диаметр фрезы"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
             <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallDepth" T="string" Label="Глубина резания ap"
@@ -28,8 +56,8 @@
             </MudText>
         </MudField>
     </MudItem>
-    <MudItem xs="12" md="4">
-        <MudField Label="Сферическая фреза: гребешок" Variant="Variant.Filled" Underline="false" Class="mt-1">
+    <MudItem xs="12" md="6" lg="4">
+        <MudField Label="Сферическая фреза: гребешок"Variant="Variant.Filled" Underline="false" Class="mt-1">
             <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="ScallopDiameter" T="string" Label="Диаметр фрезы"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
             <MudTextField Class="monofield" Variant="Variant.Text" Value="State.ScallopStep" ValueChanged="@((string v) => SetScallop(false, v))" T="string" Label="Шаг между проходами"
@@ -41,10 +69,14 @@
             </MudText>
         </MudField>
     </MudItem>
+    }
 </MudGrid>
 
 @code
 {
+    /// <summary> Какие карточки показать: chip-thinning, high-feed или ball (сферическая фреза). </summary>
+    [Parameter] public string Part { get; set; } = "chip-thinning";
+
     string ThinningResult
     {
         get
@@ -57,6 +89,24 @@
             var feed = Util.GetDouble(State.ThinningFeed);
             var result = $"Толщина стружки: {Text(factor * 100, 0)}% подачи";
             return feed > 0 ? $"{result}; подачу можно поднять до {Text(MillingMath.FeedForChipThickness(diameter, width, feed), 3)} мм/зуб" : result;
+        }
+    }
+
+    string HighFeedResult
+    {
+        get
+        {
+            var diameter = Util.GetDouble(State.HighFeedDiameter);
+            var width = Util.GetDouble(State.HighFeedWidth);
+            var fz = Util.GetDouble(State.HighFeedFz);
+            var hex = MillingMath.HighFeedChipThickness(diameter, width, Util.GetDouble(State.HighFeedAngle), fz);
+            if (double.IsNaN(hex)) return width > diameter && diameter > 0 ? "Ширина резания больше диаметра фрезы" : "—";
+            var corrected = MillingMath.HighFeedCorrectedFeed(diameter, width, fz);
+            var lines = new List<string> { $"Толщина стружки: {Text(hex, 3)} мм", $"fz с учётом ae: {Text(corrected, 3)} мм/зуб" };
+            var teeth = Util.GetDouble(State.HighFeedTeeth);
+            var speed = Util.GetDouble(State.HighFeedSpeed);
+            if (teeth > 0 && speed > 0) lines.Add($"Подача: {Text(corrected * teeth * speed, 0)} мм/мин");
+            return string.Join("\n", lines);
         }
     }
 

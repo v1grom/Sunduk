@@ -1,0 +1,18 @@
+@page "/turning"
+@page "/turning/{Tab}"
+
+<SectionTabs Section="@NavCatalog.Turning" Tab="@Tab">
+    <Content Context="key">
+        @switch (key)
+        {
+            case "thread": <ThreadTurningComponent /> break;
+            case "bore": <HoleCapacityComponent /> break;
+            case "roughness": <RoughnessComponent /> break;
+        }
+    </Content>
+</SectionTabs>
+
+@code
+{
+    [Parameter] public string? Tab { get; set; }
+}

@@ -1,29 +1,11 @@
 ﻿@page "/"
 <MudGrid Spacing="1" Class="d-flex pa-2" Justify="Justify.FlexStart">
-    <MudItem xs="6" md="4" lg="4" xl="2">
-        <SectionButton Label="Калькуляторы" Link="/calculator" Icon="@Icons.Material.Filled.Calculate" />
-    </MudItem>
-    <MudItem xs="6" md="4" lg="4" xl="2">
-        <SectionButton Label="Всякая хрень" Link="/stuff" Icon="@Icons.Material.Filled.RoundedCorner" />
-    </MudItem>
-    <MudItem xs="6" md="4" lg="4" xl="2">
-        <SectionButton Label="Конвертеры" Link="/converters" Icon="@Icons.Material.Filled.Transform" />
-    </MudItem>
-    <MudItem xs="6" md="4" lg="4" xl="2">
-        <SectionButton Label="База знаний" Link="/knowledge/center-length" Icon="@Icons.Material.Filled.MenuBook" />
-    </MudItem>
-    <MudItem xs="6" md="4" lg="4" xl="2">
-        <SectionButton Label="Расчеты времени" Link="/timecalc" Icon="@Icons.Material.Filled.Timer" />
-    </MudItem>
-    <MudItem xs="6" md="4" lg="4" xl="2">
-        <SectionButton Label="Шаблонник" Link="/dynamic-templates" Icon="@Icons.Material.Outlined.Code" />
-    </MudItem>
-    <MudItem xs="6" md="4" lg="4" xl="2">
-        <SectionButton Label="Допуски" Link="/tolerance" Icon="@Icons.Material.Filled.Straighten" />
-    </MudItem>
-    <MudItem xs="6" md="4" lg="4" xl="2">
-        <SectionButton Label="SunduCAM" Link="/sunducam" Icon="@Icons.Material.Outlined.FeaturedPlayList" />
-    </MudItem>
+    @foreach (var root in NavCatalog.Roots)
+    {
+        <MudItem xs="6" md="4" lg="4" xl="2">
+            <SectionButton Label="@root.Title" Link="@root.Href" Icon="@root.Icon" />
+        </MudItem>
+    }
 </MudGrid>
 
 @code {

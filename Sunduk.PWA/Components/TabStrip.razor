@@ -1,17 +1,17 @@
 @using MudBlazor.Extensions
-@* Вкладки в виде сетки чипов с переносом строк: все разделы видны сразу, в отличие от MudTabs с горизонтальной прокруткой *@
+@inject IJSRuntime Js
+@* Полоса вкладок: одна строка с подчёркиванием активной. Прилипает под шапкой, прокручивается вбок,
+   активная вкладка сама выезжает в видимую область, у краёв затухание показывает, что вкладки есть дальше *@
 <MudSwipeArea OnSwipeEnd="OnSwipe" Style="touch-action: pan-y;">
-    <div class="d-flex flex-wrap gap-2 px-3 py-2">
+    <div class="tab-strip" @ref="_strip" role="tablist">
         @for (var i = 0; i < Titles.Count; i++)
         {
             var index = i;
-            <MudChip T="string" Size="Size.Medium" Class="ma-0"
-                     Color="@(index == ActiveIndex ? Color.Primary : Color.Default)"
-                     Variant="@(index == ActiveIndex ? Variant.Filled : Variant.Outlined)"
-                     OnClick="() => Select(index)">@Titles[index]</MudChip>
+            <button type="button" role="tab" aria-selected="@(index == ActiveIndex ? "true" : "false")"
+                    class="@($"tab-strip-item{(index == ActiveIndex ? " active" : "")}")"
+                    @onclick="() => Select(index)">@Titles[index]</button>
         }
     </div>
-    <MudDivider />
     @Content(ActiveIndex)
 </MudSwipeArea>
 
@@ -26,6 +26,25 @@
     [Parameter] public int ActiveIndex { get; set; }
 
     [Parameter] public EventCallback<int> ActiveIndexChanged { get; set; }
+
+    private ElementReference _strip;
+    private int _revealedIndex = -1;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || _revealedIndex != ActiveIndex)
+        {
+            _revealedIndex = ActiveIndex;
+            try
+            {
+                await Js.InvokeVoidAsync("sundukTabs.attach", _strip, ActiveIndex);
+            }
+            catch (JSException)
+            {
+                // Без прокрутки вкладки остаются рабочими
+            }
+        }
+    }
 
     private async Task Select(int index)
     {

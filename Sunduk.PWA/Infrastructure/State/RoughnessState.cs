@@ -28,6 +28,12 @@ namespace Sunduk.PWA.Infrastructure.State
         public string ThinningDiameter { get; set; } = string.Empty;
         public string ThinningWidth { get; set; } = string.Empty;
         public string ThinningFeed { get; set; } = string.Empty;
+        public string HighFeedDiameter { get; set; } = string.Empty;
+        public string HighFeedWidth { get; set; } = string.Empty;
+        public string HighFeedAngle { get; set; } = string.Empty;
+        public string HighFeedFz { get; set; } = string.Empty;
+        public string HighFeedTeeth { get; set; } = string.Empty;
+        public string HighFeedSpeed { get; set; } = string.Empty;
         public string BallDiameter { get; set; } = string.Empty;
         public string BallDepth { get; set; } = string.Empty;
         public string BallSpeed { get; set; } = string.Empty;

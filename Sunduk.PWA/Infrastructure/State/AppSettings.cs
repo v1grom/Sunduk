@@ -14,6 +14,9 @@ namespace Sunduk.PWA.Infrastructure.State
 
         /// <summary> По частоте заходов пользователя (см. <see cref="NavUsage"/>). </summary>
         ByUsage,
+
+        /// <summary> Четыре пункта, выбранные пользователем (<see cref="AppSettings.NavSlots"/>). </summary>
+        Custom,
     }
 
     /// <summary>
@@ -25,6 +28,7 @@ namespace Sunduk.PWA.Infrastructure.State
         private const string ThemeKey = "theme-dark";
         private const string SkinKey = "app-skin";
         private const string NavOrderKey = "app-nav-order";
+        private const string NavSlotsKey = "app-nav-slots";
         private const string CalculatorKey = "app-calculator-enabled";
         private const string ResultFormatKey = "app-result-format";
         private const string CamFormatKey = "app-cam-format";
@@ -39,6 +43,9 @@ namespace Sunduk.PWA.Infrastructure.State
         /// <summary> Скин оформления (идентификатор из <see cref="SkinCatalog"/>). У новых и старых пользователей — sunduk. </summary>
         public string Skin { get; private set; } = AppTheme.DefaultSkin;
         public NavOrderMode NavOrder { get; private set; } = NavOrderMode.Default;
+
+        /// <summary> Адреса четырёх пунктов нижней панели в режиме <see cref="NavOrderMode.Custom"/>. </summary>
+        public IReadOnlyList<string> NavSlots { get; private set; } = NavCatalog.Normalize(null);
 
         /// <summary> Показывать ли калькулятор выражений на странице режимов. </summary>
         public bool CalculatorEnabled { get; private set; } = true;
@@ -64,6 +71,7 @@ namespace Sunduk.PWA.Infrastructure.State
                 IsDark = await _storage.GetItemAsync<bool?>(ThemeKey) ?? true;
                 Skin = AppTheme.Normalize(await _storage.GetItemAsync<string>(SkinKey));
                 NavOrder = await _storage.GetItemAsync<NavOrderMode?>(NavOrderKey) ?? NavOrderMode.Default;
+                NavSlots = NavCatalog.Normalize(await _storage.GetItemAsync<List<string>>(NavSlotsKey));
                 CalculatorEnabled = await _storage.GetItemAsync<bool?>(CalculatorKey) ?? true;
                 AnalyticsEnabled = await _storage.GetItemAsync<bool?>(AnalyticsKey) ?? true;
                 ResultFormat = ParseFormat(await _storage.GetItemAsync<string>(ResultFormatKey), ResultFormat.DefaultGeneral);
@@ -91,6 +99,12 @@ namespace Sunduk.PWA.Infrastructure.State
         public Task SetDarkAsync(bool value) => SetAsync(v => IsDark = v, value, ThemeKey, IsDark);
         public Task SetSkinAsync(string value) => SetAsync(v => Skin = v, AppTheme.Normalize(value), SkinKey, Skin);
         public Task SetNavOrderAsync(NavOrderMode value) => SetAsync(v => NavOrder = v, value, NavOrderKey, NavOrder);
+        public Task SetNavSlotsAsync(IEnumerable<string> value)
+        {
+            var slots = NavCatalog.Normalize(value);
+            return SetAsync(v => NavSlots = v, (IReadOnlyList<string>)slots, NavSlotsKey, NavSlots);
+        }
+
         public Task SetCalculatorEnabledAsync(bool value) => SetAsync(v => CalculatorEnabled = v, value, CalculatorKey, CalculatorEnabled);
 
         public Task SetAnalyticsEnabledAsync(bool value) => SetAsync(v => AnalyticsEnabled = v, value, AnalyticsKey, AnalyticsEnabled);

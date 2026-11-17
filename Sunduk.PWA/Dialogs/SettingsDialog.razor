@@ -20,10 +20,27 @@
             <div>
                 <MudText Typo="Typo.overline" Class="d-block">Нижняя панель на телефоне</MudText>
                 <MudRadioGroup T="NavOrderMode" Value="Settings.NavOrder" ValueChanged="@(v => Settings.SetNavOrderAsync(v))">
-                    <MudRadio Value="NavOrderMode.Default" Color="Color.Primary">Стандартная: режимы, хрень, допуски, база знаний</MudRadio>
-                    <MudRadio Value="NavOrderMode.ByUsage" Color="Color.Primary">По использованию: самые частые разделы</MudRadio>
+                    <MudRadio Value="NavOrderMode.Default" Color="Color.Primary">Стандартная: режимы, токарка, фрезеровка, допуски</MudRadio>
+                    <MudRadio Value="NavOrderMode.ByUsage" Color="Color.Primary">По использованию: самые частые пункты</MudRadio>
+                    <MudRadio Value="NavOrderMode.Custom" Color="Color.Primary">Свои четыре пункта</MudRadio>
                 </MudRadioGroup>
-                <MudText Typo="Typo.caption" Class="d-block">«Ещё» остаётся последней кнопкой в любом режиме. Статистика хранится только на этом устройстве.</MudText>
+                @if (Settings.NavOrder == NavOrderMode.Custom)
+                {
+                    @for (var slot = 0; slot < NavCatalog.Slots; slot++)
+                    {
+                        var index = slot;
+                        <MudSelect T="string" Label="@($"Пункт {index + 1}")" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                                   Value="Settings.NavSlots[index]" ValueChanged="@(v => SetSlot(index, v))">
+                            @foreach (var item in NavCatalog.All)
+                            {
+                                <MudSelectItem T="string" Value="@item.Href" Disabled="@(Settings.NavSlots.Contains(item.Href) && Settings.NavSlots[index] != item.Href)">
+                                    <MudIcon Icon="@item.Icon" Size="Size.Small" Class="mr-2" style="vertical-align: middle;" />@NavCatalog.Label(item)
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                }
+                <MudText Typo="Typo.caption" Class="d-block">В панель можно вынести и раздел целиком, и любую его вкладку. «Ещё» остаётся последней кнопкой в любом режиме. Статистика хранится только на этом устройстве.</MudText>
             </div>
 
             <div>
@@ -79,6 +96,13 @@
             Формат @format.Pattern: 12.5 → @format.Format(12.5), 0.25 → @format.Format(0.25), 3.14159 → @format.Format(3.14159)
         </MudText>
     };
+
+    private Task SetSlot(int index, string href)
+    {
+        var slots = Settings.NavSlots.ToList();
+        slots[index] = href;
+        return Settings.SetNavSlotsAsync(slots);
+    }
 
     private async Task ResetAllAsync()
     {
