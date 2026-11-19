@@ -1,0 +1,14 @@
+@* Рамка эскиза расчёта. Рисунок схематичный, не в масштабе: цвета берутся из темы (классы sk-* в site.css),
+   размер поля, в котором стоит курсор, подсвечивается акцентом *@
+<MudPaper Outlined="true" Class="sketch mt-1 rounded-0">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200" width="100%" height="@Height" preserveAspectRatio="xMidYMid meet">
+        @ChildContent
+    </svg>
+</MudPaper>
+
+@code
+{
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public int Height { get; set; } = 240;
+}

@@ -1,0 +1,83 @@
+@* Профиль резьбы в осевом разрезе (не в масштабе): угол профиля по стандарту (60°, 55° у трубных, 30° у трапецеидальной),
+   шаг P, высота профиля h, диаметр D от оси. Наружная — материал под профилем, внутренняя — над ним *@
+<Sketch>
+    <line class="sk-axis" x1="10" y1="@F(Axis)" x2="292" y2="@F(Axis)" />
+    <path class="sk-part" d="@_partPath" />
+
+    <path class="sk-thin" d="@_extensionPath" />
+    <SketchDim X1="@_pitchFrom" Y1="@_pitchY" X2="@(_pitchFrom + Pitch)" Y2="@_pitchY" Label="P" LabelX="@(_pitchFrom + Pitch / 2)" LabelY="@(_pitchY - 5)" Active="@(Active == "pitch")" />
+    <SketchDim X1="288" Y1="@Major" X2="288" Y2="@Minor" Label="h" LabelX="279" LabelY="@((Major + Minor) / 2 + 4)" Anchor="end" />
+    <SketchDim X1="38" Y1="@Axis" X2="38" Y2="@Major" Label="D" LabelX="44" LabelY="@(Internal ? 150 : 140)" Anchor="start" Active="@(Active == "diameter")" />
+
+    <SketchAngle Cx="@_apexX" Cy="@_apexY" R="@_angleRadius" From="@_angleFrom" To="@_angleTo" Label="@($"{F(ProfileAngle)}°")" LabelX="@_apexX" LabelY="@_angleLabelY" />
+</Sketch>
+
+@code
+{
+    /// <summary> Внутренняя резьба вместо наружной. </summary>
+    [Parameter] public bool Internal { get; set; }
+
+    /// <summary> Угол профиля, °. </summary>
+    [Parameter] public double ProfileAngle { get; set; } = 60;
+
+    /// <summary> Подсвечиваемый размер: diameter или pitch. </summary>
+    [Parameter] public string? Active { get; set; }
+
+    private const double Axis = 190;
+    private const double Major = 60;
+    private const double Minor = 96;
+    private const double Pitch = 60;
+    private const double FirstMajor = 30;
+
+    private double _pitchFrom, _pitchY, _apexX, _apexY, _angleRadius, _angleFrom, _angleTo, _angleLabelY;
+    private string _partPath = string.Empty, _extensionPath = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        var half = Math.Clamp(ProfileAngle, 20, 90) / 2 * Math.PI / 180;
+        var run = (Minor - Major) * Math.Tan(half);
+        // площадки у вершины и впадины одинаковые: остаток шага после двух боковых сторон
+        var flat = (Pitch - 2 * run) / 2;
+
+        // профиль чередует площадки на большом (Major) и малом (Minor) диаметре, начиная с большого
+        var path = new System.Text.StringBuilder($"M14,{F(Major)}");
+        for (var k = 0; k < 5; k++)
+        {
+            var major = FirstMajor + k * Pitch;
+            var minor = major + Pitch / 2;
+            path.Append($" L{F(Math.Min(major + flat / 2, 276))},{F(Major)}");
+            if (k == 4) break;
+            path.Append($" L{F(minor - flat / 2)},{F(Minor)} L{F(minor + flat / 2)},{F(Minor)} L{F(major + Pitch - flat / 2)},{F(Major)}");
+        }
+        _partPath = path + (Internal ? " L276,16 L14,16 Z" : $" L276,{F(Axis - 12)} L14,{F(Axis - 12)} Z");
+
+        // шаг — между вершинами витков: у наружной они на большом диаметре, у внутренней — на малом
+        _pitchFrom = Internal ? FirstMajor + Pitch * 1.5 : FirstMajor + Pitch;
+        var crestY = Internal ? Minor : Major;
+        _pitchY = Internal ? Minor + 22 : Major - 20;
+        var tick = Internal ? 4 : -4;
+
+        // угол — во впадине между витками, вершина угла на продолжении боковых сторон
+        var gapX = Internal ? FirstMajor + Pitch * 2 : FirstMajor + Pitch * 1.5;
+        var gapY = Internal ? Major : Minor;
+        var depth = flat / 2 / Math.Tan(half);
+        _apexX = gapX;
+        _apexY = Internal ? gapY - depth : gapY + depth;
+        _angleRadius = depth + 16;
+        var degrees = half * 180 / Math.PI;
+        _angleFrom = Internal ? 270 - degrees : 90 - degrees;
+        _angleTo = Internal ? 270 + degrees : 90 + degrees;
+        _angleLabelY = Internal ? _apexY + _angleRadius + 12 : _apexY - _angleRadius - 5;
+
+        var flankX = depth * Math.Tan(half) + _angleRadius * Math.Sin(half);
+        var flankY = Internal ? _apexY + _angleRadius * Math.Cos(half) : _apexY - _angleRadius * Math.Cos(half);
+        _extensionPath =
+            $"M{F(_pitchFrom)},{F(crestY)} L{F(_pitchFrom)},{F(_pitchY + tick)} " +
+            $"M{F(_pitchFrom + Pitch)},{F(crestY)} L{F(_pitchFrom + Pitch)},{F(_pitchY + tick)} " +
+            $"M276,{F(Major)} L294,{F(Major)} M{F(FirstMajor + 3.5 * Pitch + flat / 2)},{F(Minor)} L294,{F(Minor)} " +
+            $"M{F(gapX - flat / 2)},{F(gapY)} L{F(_apexX)},{F(_apexY)} L{F(gapX + flat / 2)},{F(gapY)} " +
+            $"M{F(_apexX - flankX + depth * Math.Tan(half))},{F(flankY)} L{F(_apexX)},{F(_apexY)} L{F(_apexX + flankX - depth * Math.Tan(half))},{F(flankY)}";
+    }
+
+    private static string F(double value) => SketchDim.F(value);
+}

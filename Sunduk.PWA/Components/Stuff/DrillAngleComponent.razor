@@ -1,17 +1,19 @@
 @inject DrillAngleState State
 <MudGrid Spacing="1" Class="pa-2">
-        <MudItem xs="6">
-            <MudTextField Class="monofield" @bind-Value="_DrillDiameter" T="string" Label="Диаметр" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" 
-                          @onfocus="() => CurrentImage = Images.DrillDiameter"
-                          @onfocusout="() => CurrentImage = Images.Drill"/>
-        </MudItem>
-        <MudItem xs="6">
-            <MudTextField Class="monofield" @bind-Value="_DrillAngle" T="string" Label="Угол" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="°" Immediate="true"
-                          @onfocus="() => CurrentImage = Images.DrillAngle"
-                          @onfocusout="() => CurrentImage = Images.Drill"/>
-        </MudItem>
         <MudItem xs="12">
-            <MudField Label="Углы" Variant="Variant.Filled" Underline="false">
+            <MudField Label="Параметры" Variant="Variant.Filled" Underline="false" Class="mt-1">
+                <MudGrid Spacing="1">
+                    <MudItem xs="6">
+                        <MudTextField Class="monofield" @bind-Value="_DrillDiameter" T="string" Label="Диаметр" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense"
+                                      @onfocus="() => CurrentImage = Images.DrillDiameter"
+                                      @onfocusout="() => CurrentImage = Images.Drill"/>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField Class="monofield" @bind-Value="_DrillAngle" T="string" Label="Угол" Variant="Variant.Text" Adornment="Adornment.End" AdornmentText="°" Immediate="true" Margin="Margin.Dense"
+                                      @onfocus="() => CurrentImage = Images.DrillAngle"
+                                      @onfocusout="() => CurrentImage = Images.Drill"/>
+                    </MudItem>
+                </MudGrid>
                 <MudGrid Spacing="2" Class="mt-1">
                     <MudItem xs="4">
                         <MudButton Variant="Variant.Filled" FullWidth="true" OnClick="@(() => _DrillAngle = "118")">118°</MudButton>
@@ -28,8 +30,8 @@
         @if (DrillDiameter > 0 && DrillAngle > 0 && DrillAngle < 180)
         {
             <MudItem xs="12">
-                <MudField Variant="Variant.Filled">
-                    <MudText>@ResultMessage</MudText>
+                <MudField Label="Результат" Variant="Variant.Filled" Underline="false">
+                    <MudText Typo="Typo.body2">@ResultMessage</MudText>
                 </MudField>
             </MudItem>
         }

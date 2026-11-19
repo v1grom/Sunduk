@@ -1,0 +1,86 @@
+@* Токарная фаска в осевом разрезе, угол рисуется по введённому (размеры — не в масштабе).
+   Наружная: образующая детали сверху, фаска уходит к торцу вниз; внутренняя — зеркально, материал над отверстием.
+   Глубина — вдоль оси Z, угол — между образующей и фаской, диаметры — от оси детали *@
+<Sketch>
+    <line class="sk-axis" x1="20" y1="@F(Axis)" x2="285" y2="@F(Axis)" />
+    <path class="sk-part" d="@_partPath" />
+    <path class="sk-line @(Active == "r" ? "active" : null)" d="@_insertPath" />
+    <g><text x="@F(InsertX - 18)" y="@F(_insertLabelY)" text-anchor="middle" class="@(Active == "r" ? "active" : null)">r</text></g>
+
+    <path class="sk-thin" d="@_extensionPath" />
+    <SketchDim X1="@_startX" Y1="@_sizeDimY" X2="@Face" Y2="@_sizeDimY" Outside="@(Face - _startX < 22)" Label="Глубина" LabelX="@((_startX + Face) / 2)" LabelY="@(_sizeDimY - 5)" Active="@(Active == "size")" />
+
+    <SketchAngle Cx="@_startX" Cy="@Surface" R="34" From="@_angleFrom" To="@_angleTo" Label="@($"{F(_angle)}°")" LabelX="@_angleLabel.X" LabelY="@_angleLabel.Y" Active="@(Active == "angle")" />
+
+    <SketchDim X1="62" Y1="@Axis" X2="62" Y2="@Surface" Label="Øкон" LabelX="68" LabelY="@((Axis + Surface) / 2 + 4)" Anchor="start" Active="@(Active == "end")" />
+    <SketchDim X1="@(Face + 22)" Y1="@Axis" X2="@(Face + 22)" Y2="@_endY" Label="Øнач" LabelX="@(Face + 28)" LabelY="@((Axis + _endY) / 2 + 4)" Anchor="start" Active="@(Active == "start")" />
+</Sketch>
+
+@code
+{
+    /// <summary> Внутренняя фаска (в отверстии) вместо наружной. </summary>
+    [Parameter] public bool Internal { get; set; }
+
+    /// <summary> Угол фаски, °; рисуется в пределах 10…80°, без угла — 45°. </summary>
+    [Parameter] public double Angle { get; set; }
+
+    /// <summary> Подсвечиваемый размер: size, angle, end, start или r. </summary>
+    [Parameter] public string? Active { get; set; }
+
+    private const double Axis = 190;
+    private const double Face = 190;
+    private const double Left = 30;
+    private const double FaceLength = 60;
+    private const double InsertX = 262;
+
+    private double Surface => Internal ? 120 : 62;
+
+    private double _angle, _startX, _endY, _sizeDimY, _angleFrom, _angleTo, _insertLabelY;
+    private (double X, double Y) _angleLabel;
+    private string _partPath = string.Empty, _insertPath = string.Empty, _extensionPath = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        _angle = Angle > 0 && Angle < 90 ? Angle : 45;
+        var drawn = Math.Clamp(_angle, 10, 80) * Math.PI / 180;
+        // вниз к торцу у наружной фаски, вверх — у внутренней
+        var s = Internal ? -1 : 1;
+
+        _startX = Face - FaceLength * Math.Cos(drawn);
+        _endY = Surface + s * FaceLength * Math.Sin(drawn);
+        _sizeDimY = Surface - s * 26;
+
+        _partPath = Internal
+            ? $"M{F(Left)},{F(Surface)} L{F(_startX)},{F(Surface)} L{F(Face)},{F(_endY)} L{F(Face)},16 L{F(Left)},16 Z"
+            : $"M{F(Left)},{F(Surface)} L{F(_startX)},{F(Surface)} L{F(Face)},{F(_endY)} L{F(Face)},{F(Axis - 12)} L{F(Left)},{F(Axis - 12)} Z";
+
+        // продолжение фаски за её начало — сторона угла; выносные для глубины и начального диаметра
+        var backX = _startX - 44 * Math.Cos(drawn);
+        var backY = Surface - s * 44 * Math.Sin(drawn);
+        _extensionPath = $"M{F(_startX)},{F(Surface)} L{F(backX)},{F(backY)} " +
+                         $"M{F(_startX)},{F(Surface)} L{F(_startX)},{F(_sizeDimY - s * 4)} " +
+                         $"M{F(Face)},{F(_endY)} L{F(Face)},{F(_sizeDimY - s * 4)} " +
+                         $"M{F(Face)},{F(_endY)} L{F(Face + 28)},{F(_endY)}";
+
+        var degrees = Math.Clamp(_angle, 10, 80);
+        _angleFrom = Internal ? 180 : 180 - degrees;
+        _angleTo = Internal ? 180 + degrees : 180;
+        var middle = (Internal ? 180 + degrees / 2 : 180 - degrees / 2) * Math.PI / 180;
+        _angleLabel = (_startX + 48 * Math.Cos(middle), Surface - 48 * Math.Sin(middle) + 4);
+
+        // пластина отдельно справа, вершиной к фаске; главная кромка отклонена от вертикали к торцу на 5° —
+        // угол в плане 95°, как у обычного проходного резца
+        const double r = 9, edge = 60;
+        var cy = Internal ? 150 : 104;
+        var leftX = InsertX - r;
+        var arcEndX = InsertX + r * 0.5;
+        var arcEndY = cy + s * r * 0.87;
+        var lean = edge * Math.Tan(5 * Math.PI / 180);
+        _insertPath = $"M{F(leftX + lean)},{F(cy - s * edge)} L{F(leftX)},{F(cy)} " +
+                      $"A{F(r)},{F(r)} 0 0 {(Internal ? 1 : 0)} {F(arcEndX)},{F(arcEndY)} " +
+                      $"L{F(arcEndX + 34)},{F(arcEndY - s * 20)}";
+        _insertLabelY = cy + s * 22;
+    }
+
+    private static string F(double value) => SketchDim.F(value);
+}

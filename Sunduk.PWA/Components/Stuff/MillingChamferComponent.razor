@@ -1,0 +1,162 @@
+@inject MillingChamferState State
+<MudGrid Spacing="1" Class="pa-2">
+    <MudItem xs="12" sm="6">
+        <MudField Label="Параметры фаски" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudRadioGroup T="MillingChamferState.Kind" @bind-Value="State.Mode" Class="mb-n2 d-flex justify-center">
+                <MudRadio Value="@MillingChamferState.Kind.Edge" Color="Color.Primary">По контуру</MudRadio>
+                <MudRadio Value="@MillingChamferState.Kind.Hole" Color="Color.Primary">Отверстие</MudRadio>
+            </MudRadioGroup>
+            @if (State.Mode == MillingChamferState.Kind.Hole)
+            {
+                <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HoleDiameter" T="string" Label="Диаметр отверстия" @onfocus="@(() => _active = "hole")"
+                              InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            }
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.Width" T="string" Label="@(State.Mode == MillingChamferState.Kind.Hole ? "Ширина фаски на сторону" : "Ширина фаски")" @onfocus="@(() => _active = "width")"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ToolAngle" T="string" Label="Угол фрезы при вершине" @onfocus="@(() => _active = "angle")"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="°" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.TipDiameter" T="string" Label="Диаметр вершины" @onfocus="@(() => _active = "tip")"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            @if (State.Mode == MillingChamferState.Kind.Edge)
+            {
+                <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.Overtravel" T="string" Label="Вершина ниже фаски на" @onfocus="@(() => _active = "over")"
+                              InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            }
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ToolDiameter" T="string" Label="Диаметр фрезы (для проверки)" @onfocus="@(() => _active = "tool")"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+        </MudField>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <MillingChamferSketch Hole="@(State.Mode == MillingChamferState.Kind.Hole)" ToolAngle="@ToolAngle" Active="@_active" />
+    </MudItem>
+    <MudItem xs="12">
+        <MudField Label="Результат" Variant="Variant.Filled" Underline="false">
+            @foreach (var line in ResultLines)
+            {
+                <MudText Typo="Typo.body2">@line</MudText>
+            }
+        </MudField>
+    </MudItem>
+    @if (Problem is { } problem)
+    {
+        <MudItem xs="12">
+            <MudAlert Class="rounded-0" Severity="Severity.Warning" Icon="@Icons.Material.Filled.WarningAmber">@problem</MudAlert>
+        </MudItem>
+    }
+    @if (Example is { } example)
+    {
+        <MudItem xs="12">
+            <NcExample Program="@example" />
+        </MudItem>
+    }
+    <MudItem xs="12">
+        @if (State.Mode == MillingChamferState.Kind.Edge)
+        {
+            <CalcNote>
+                Контур программируется по чертежу детали с коррекцией G41/G42, в корректор радиуса записывается расстояние от оси фрезы до стенки.
+                Вершина уходит ниже фаски, чтобы не оставить заусенец: ось стоит от стенки на d0/2 + Δ·tg(φ/2), глубина — b/tg(φ/2) + Δ.
+            </CalcNote>
+            <CalcNote>
+                Угол фаски задаётся фрезой: фреза 90° даёт фаску 45°. Если ниже кромки уступ или дно, проверьте, что вершина до него не достаёт.
+            </CalcNote>
+        }
+        else
+        {
+            <CalcNote>
+                Фреза врезается по оси отверстия, пока диаметр конуса у верхней грани не станет Dотв + 2·b: Z = (Dотв + 2·b − d0) / (2·tg(φ/2)).
+                Для зенковки и центровки так же; если фаска больше фрезы, снимайте её по кругу в режиме «По контуру».
+            </CalcNote>
+        }
+    </MudItem>
+</MudGrid>
+
+@code
+{
+    /// <summary> Размер на эскизе, соответствующий полю в фокусе. </summary>
+    string? _active;
+
+    double ToolAngle => Util.GetDouble(State.ToolAngle);
+    double TipDiameter => Util.GetDouble(State.TipDiameter);
+    double ToolDiameter => Util.GetDouble(State.ToolDiameter);
+    double Width => Util.GetDouble(State.Width);
+    double Overtravel => Util.GetDouble(State.Overtravel);
+    double HoleDiameter => Util.GetDouble(State.HoleDiameter);
+
+    double Tan => Math.Tan(ToolAngle / 2 * Math.PI / 180);
+
+    MillingMath.EdgeChamferResult? Edge => MillingMath.EdgeChamfer(ToolAngle, TipDiameter, Width, Overtravel);
+
+    double HoleDepth => MillingMath.HoleChamferDepth(ToolAngle, TipDiameter, HoleDiameter, Width);
+
+    double HoleTopDiameter => HoleDiameter + 2 * Width;
+
+    IEnumerable<string> ResultLines
+    {
+        get
+        {
+            if (State.Mode == MillingChamferState.Kind.Edge)
+            {
+                if (Edge is not { } r) return ["—"];
+                return
+                [
+                    $"Глубина вершины: Z-{Text(r.Depth)}",
+                    $"Корректор радиуса: {Text(r.Offset)} мм",
+                    $"Высота фаски по стенке: {Text(r.Height)} мм",
+                    $"Диаметр в работе: наибольший {Text(r.MaxDiameter)} мм, средний {Text(r.MeanDiameter)} мм",
+                ];
+            }
+            if (double.IsNaN(HoleDepth)) return ["—"];
+            return
+            [
+                $"Глубина вершины: Z-{Text(HoleDepth)}",
+                $"Диаметр фаски у грани: {Text(HoleTopDiameter)} мм",
+                $"Высота фаски по стенке: {Text(Width / Tan)} мм",
+            ];
+        }
+    }
+
+    string? Problem
+    {
+        get
+        {
+            if (ToolAngle >= 180) return "Угол при вершине должен быть меньше 180°";
+            if (State.Mode == MillingChamferState.Kind.Edge)
+            {
+                if (Edge is { } r && ToolDiameter > 0 && r.MaxDiameter > ToolDiameter)
+                    return $"Фаска не помещается на конус: в работе нужен диаметр {Text(r.MaxDiameter)} мм, а у фрезы {Text(ToolDiameter)} мм";
+                return null;
+            }
+            if (HoleDiameter > 0 && TipDiameter >= HoleDiameter) return "Вершина фрезы не входит в отверстие: площадка будет резать грань";
+            if (!double.IsNaN(HoleDepth) && ToolDiameter > 0 && HoleTopDiameter > ToolDiameter)
+                return $"Фаска больше фрезы: нужен диаметр {Text(HoleTopDiameter)} мм, а у фрезы {Text(ToolDiameter)} мм. Снимайте её по кругу в режиме «По контуру»";
+            return null;
+        }
+    }
+
+    string? Example
+    {
+        get
+        {
+            if (State.Mode == MillingChamferState.Kind.Edge)
+            {
+                if (Edge is not { } r) return null;
+                return
+                    "G0 Z5.\n" +
+                    $"G1 Z-{r.Depth.NC()} F100\n" +
+                    "G41 D1 X.. Y..\n" +
+                    "...\n" +
+                    "G40 X.. Y..\n" +
+                    "G0 Z50.\n" +
+                    $"(D1 = {r.Offset.NC()})";
+            }
+            if (double.IsNaN(HoleDepth)) return null;
+            return
+                "G0 X0. Y0.\n" +
+                "Z5.\n" +
+                $"G82 R2. Z-{HoleDepth.NC()} P300 F100\n" +
+                "G80";
+        }
+    }
+
+    static string Text(double value) => value == 0 ? "0" : value.ToPrettyString();
+}

@@ -1,0 +1,24 @@
+@inject IJSRuntime JS
+@* Раскрывающийся пример программы, как в токарных расчётах: моноширинный текст только для чтения *@
+<MudExpansionPanel Class="rounded-0" Text="@Title" ExpandedChanged="OnExpanded">
+    @Options
+    <MudTextField Variant="Variant.Text" Class="monofield" Lines="@Lines" AutoGrow="true" Value="@Program" ReadOnly="true" />
+</MudExpansionPanel>
+
+@code
+{
+    [Parameter] public string Title { get; set; } = "Пример программы для Fanuc";
+
+    /// <summary> Текст программы, строки через «\n». </summary>
+    [Parameter, EditorRequired] public string Program { get; set; } = string.Empty;
+
+    /// <summary> Переключатели над программой (вариант обработки и т. п.). </summary>
+    [Parameter] public RenderFragment? Options { get; set; }
+
+    private int Lines => Program.Count(c => c == '\n') + 1;
+
+    private async Task OnExpanded(bool expanded)
+    {
+        if (expanded) await JS.TriggerAutoGrow();
+    }
+}

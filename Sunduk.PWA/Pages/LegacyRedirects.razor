@@ -1,21 +1,21 @@
 @page "/stuff"
 @page "/converters"
-@page "/tolerance"
+@page "/material"
+@page "/material/{Tab}"
+@page "/geometry/chamfer"
+@page "/geometry/arcs"
+@page "/knowledge/custom-victor-cycles"
 @inject NavigationManager Navigation
-@* Старые адреса разделов (закладки, установленные PWA) ведут в новые места *@
+@* Старые адреса разделов (закладки, установленные PWA) ведут в новые места по NavCatalog.Moved *@
 
 @code
 {
+    [Parameter] public string? Tab { get; set; }
+
     protected override void OnInitialized()
     {
         var path = new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/').ToLowerInvariant();
-        var target = path switch
-        {
-            "/stuff" => NavCatalog.Turning,
-            "/converters" => NavCatalog.Geometry,
-            "/tolerance" => NavCatalog.Material + "/tolerance",
-            _ => "/",
-        };
-        Navigation.NavigateTo(target, replace: true);
+        var target = NavCatalog.Migrate(path);
+        Navigation.NavigateTo(target == path ? "/" : target, replace: true);
     }
 }

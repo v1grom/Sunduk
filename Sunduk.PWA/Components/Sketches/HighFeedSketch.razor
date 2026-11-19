@@ -1,0 +1,31 @@
+@* Вид сбоку на high feed фрезу: режущая кромка наклонена к дну под малым углом κ, следующий зуб
+   смещён на подачу fz, а снимаемый слой (стружка) толщиной всего h = fz·sin κ *@
+<Sketch>
+    <path class="sk-part" d="M10,150 L100,150 L240,112.5 L292,112.5 L292,186 L10,186 Z" />
+    @* слой, который снимет следующий зуб *@
+    <path class="sk-chip" d="M100,150 L240,112.5 L280,112.5 L140,150 Z" />
+
+    <path class="sk-line" d="M100,150 L240,112.5 L250,80 L85,80 Z" />
+    <path class="sk-line" d="M70,80 L70,22 L262,22 L262,80 Z" />
+    <path class="sk-tool @(Active == "feed" ? "active" : null)" d="M140,150 L280,112.5" />
+
+    <path class="sk-thin" d="M100,150 L152,150" />
+    <SketchAngle Cx="100" Cy="150" R="46" From="0" To="15" Label="κ" LabelX="162" LabelY="166" Active="@(Active == "angle")" />
+
+    <path class="sk-thin" d="M100,150 L100,176 M140,150 L140,176" />
+    <SketchDim X1="100" Y1="171" X2="140" Y2="171" Label="fz" LabelX="120" LabelY="166" Active="@(Active == "feed")" />
+
+    <SketchDim X1="170" Y1="131.25" X2="172.7" Y2="141.25" Outside="true" Label="h" LabelX="186" LabelY="160" />
+
+    <g class="sk-dim">
+        <line x1="200" y1="10" x2="240" y2="10" />
+        <path d="M244,10 L234,6 L234,14 Z" />
+        <text x="196" y="14" text-anchor="end">подача</text>
+    </g>
+</Sketch>
+
+@code
+{
+    /// <summary> Подсвечиваемый размер: angle или feed. </summary>
+    [Parameter] public string? Active { get; set; }
+}

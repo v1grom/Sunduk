@@ -1,145 +1,31 @@
 ﻿@page "/knowledge"
-@page "/knowledge/{article}"
-@using MudBlazor.Services
+@page "/knowledge/{Tab}"
 
-    <MudGrid Spacing="1" Class="pa-2 mx-n1">
-        <MudItem xs="12" sm="4" lg="3" >
-            <MudList Dense="true" T="string" @bind-Value="Article" Class="mt-n1">
-                @* <MudListItem Dense="true" Class="pl-1" Gutters="false" Icon="@Icons.Material.Filled.Info" Value="About" Href="@($"/knowledge/{About}")">
-                    <MudText Class="mx-n4" Typo="Typo.body2">О разделе</MudText>
-                </MudListItem> *@
-                <MudListItem Dense="true" Class="pl-1" Gutters="false" Icon="@Icons.Material.Filled.Folder">
-                    <ChildContent>
-                        <MudText Class="mx-n4" Typo="Typo.body2">Справочник</MudText>
-                    </ChildContent>
-                    <NestedList>
-                        <MudListItem Dense="true" Icon="@Icons.Material.Filled.Info" Value="Formulas" Href="@($"/knowledge/{Formulas}")">
-                            <MudText Class="mx-n4" Typo="Typo.body2">Формулы</MudText>
-                        </MudListItem>
-                        <MudListItem Dense="true" Icon="@Icons.Material.Filled.Info" Value="CenterLength" Href="@($"/knowledge/{CenterLength}")">
-                            <MudText Class="mx-n4" Typo="Typo.body2">Глубина центровки</MudText>
-                        </MudListItem>
-                        <MudListItem Dense="true" Icon="@Icons.Material.Filled.Info" Value="BsppThread" Href="@($"/knowledge/{BsppThread}")">
-                            <MudText Class="mx-n4" Typo="Typo.body2">Резьба BSPP (G)</MudText>
-                        </MudListItem>
-                        <MudListItem Dense="true" Icon="@Icons.Material.Filled.Info" Value="NptThread" Href="@($"/knowledge/{NptThread}")">
-                            <MudText Class="mx-n4" Typo="Typo.body2">Резьба NPT (K)</MudText>
-                        </MudListItem>
-                        <MudListItem Dense="true" Icon="@Icons.Material.Filled.Info" Value="Vectors" Href="@($"/knowledge/{Vectors}")">
-                            <MudText Class="mx-n4" Typo="Typo.body2">Векторы</MudText>
-                        </MudListItem>
-                    </NestedList>
-                </MudListItem>
-
-                <MudListItem Dense="true" Class="pl-1" Gutters="false" Icon="@Icons.Material.Filled.Folder">
-                    <ChildContent>
-                        <MudText Class="mx-n4" Typo="Typo.body2">Fanuc</MudText>
-                    </ChildContent>
-                    <NestedList>
-                        <MudListItem Dense="true" Icon="@Icons.Material.Filled.Info" Value="MacroB" Href="@($"/knowledge/{MacroB}")">
-                            <MudText Class="mx-n4" Typo="Typo.body2">Macro B</MudText>
-                        </MudListItem>
-                        <MudListItem Dense="true" Icon="@Icons.Material.Filled.Info" Value="CustomVictorCycles" Href="@($"/knowledge/{CustomVictorCycles}")">
-                            <MudText Class="mx-n4" Typo="Typo.body2">Циклы Victor</MudText>
-                        </MudListItem>
-                        @*<MudListItem Dense=true Icon="@Icons.Material.Filled.Info" Value="FanucGeneralProgramming" Href="@($"/knowledge/{FanucGeneralProgramming}")">
-                            <MudText Class="mx-n4" Typo=Typo.body2>Общая информация</MudText>
-                        </MudListItem>
-                        <MudListItem Dense=true Icon="@Icons.Material.Filled.Info" Value="FanucG00" Href="@($"/knowledge/{FanucG00}")">
-                            <MudText Class="mx-n4" Typo=Typo.body2>G00</MudText>
-                        </MudListItem>
-                        <MudListItem Dense=true Icon="@Icons.Material.Filled.Info" Value="FanucG01" Href="@($"/knowledge/{FanucG01}")"">
-                            <MudText Class="mx-n4" Typo=Typo.body2>G01</MudText>
-                        </MudListItem>*@
-                    </NestedList>
-                </MudListItem>
-            </MudList>
-        </MudItem>
-        <MudItem xs="12" sm="8" lg="9" Class="mr-n4">
-            @switch (Article?.ToString())
-            {
-                case About:
-                    <AboutKnowledgeComponent />
-                    break;
-                case Formulas:
-                    <FormulasComponent />
-                    break;
-                case CuttingSpeeds:
-                    <CuttingSpeedsComponent />
-                    break;
-                case CenterLength:
-                    <CenterLengthComponent />
-                    break;
-                case Vectors:
-                    <VectorComponent/>
-                    break;
-                case BsppThread:
-                    <BsppThreadComponent/>
-                    break;
-                case NptThread:
-                    <NptThreadComponent/>
-                    break;
-                case MacroB:
-                    <FanucMacroVariables />
-                    break;
-                case CustomVictorCycles:
-                    <CustomVictorCycles />
-                    break;
-                case FanucGeneralProgramming:
-                    <GeneralPrograming />
-                    break;
-                case FanucG00:
-                    <ProgrammingG00 />
-                    break;
-                case FanucG01:
-                    <ProgrammingG01 />
-                    break;
-            }
-        </MudItem>
-    </MudGrid>
-
-
-@code 
-{
-    [Parameter]
-    public string Article { get; set; }
-
-
-    private Guid _subscriptionId;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
+<SectionTabs Section="@NavCatalog.Knowledge" Tab="@Tab">
+    <Content Context="key">
+        @switch (key)
         {
-            new ResizeOptions
-            {
-                ReportRate = 250,
-                NotifyOnBreakpointOnly = true,
-            };
-            StateHasChanged();
+            @* Расчётные компоненты задают отступы сами, статьям-таблицам их даёт обёртка *@
+            case "hardness": <HardnessConverterComponent /> break;
+            case "ra-rz": <RoughnessConverterComponent /> break;
+            case "vectors": <VectorComponent /> break;
+            default:
+                <div class="pa-3">
+                    @switch (key)
+                    {
+                        case "bspp-thread": <BsppThreadComponent /> break;
+                        case "npt-thread": <NptThreadComponent /> break;
+                        case "center-length": <CenterLengthComponent /> break;
+                        case "formulas": <FormulasComponent /> break;
+                        case "macro-b": <FanucMacroVariables /> break;
+                    }
+                </div>
+                break;
         }
+    </Content>
+</SectionTabs>
 
-        await base.OnAfterRenderAsync(firstRender);
-    }
-
-    protected override void OnParametersSet()
-    {
-        // Адрес /knowledge без статьи открывает статью по умолчанию
-        if (string.IsNullOrEmpty(Article)) Article = CenterLength;
-    }
-
-    public Breakpoint Breakpoint { get; set; }
-    
-    const string About = "about";
-    const string Formulas = "formulas";
-    const string CuttingSpeeds = "cutting-speeds";
-    const string CenterLength = "center-length";
-    const string NptThread = "npt-thread";
-    const string BsppThread = "bspp-thread";
-    const string MacroB = "macro-b";
-    const string Vectors = "vectors";
-    const string CustomVictorCycles = "custom-victor-cycles";
-    const string FanucGeneralProgramming = "fanuc-general-programming";
-    const string FanucG00 = "fanuc-g00";
-    const string FanucG01 = "fanuc-g01";
+@code
+{
+    [Parameter] public string? Tab { get; set; }
 }

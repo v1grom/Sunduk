@@ -27,7 +27,11 @@ namespace Sunduk.PWA.Infrastructure.State
         {
             try
             {
-                _visits = await _storage.GetItemAsync<Dictionary<string, int>>(StorageKey) ?? new();
+                var stored = await _storage.GetItemAsync<Dictionary<string, int>>(StorageKey) ?? new();
+                // Заходы в переехавшие разделы засчитываются их новым адресам
+                _visits = stored
+                    .GroupBy(p => NavCatalog.Migrate(p.Key), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.Sum(p => p.Value), StringComparer.OrdinalIgnoreCase);
             }
             catch
             {

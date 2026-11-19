@@ -1,0 +1,37 @@
+@* Угловой размер: дуга с центром (Cx, Cy) от угла From до To. Углы в градусах против часовой стрелки от оси X вправо,
+   как на чертеже (в SVG ось Y смотрит вниз — пересчёт внутри) *@
+<g class="sk-angle @(Active ? "active" : null)">
+    <path d="@_arc" />
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <g><text x="@SketchDim.F(LabelX)" y="@SketchDim.F(LabelY)" text-anchor="middle">@Label</text></g>
+    }
+</g>
+
+@code
+{
+    [Parameter] public double Cx { get; set; }
+    [Parameter] public double Cy { get; set; }
+    [Parameter] public double R { get; set; }
+    [Parameter] public double From { get; set; }
+    [Parameter] public double To { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public double LabelX { get; set; }
+    [Parameter] public double LabelY { get; set; }
+    [Parameter] public bool Active { get; set; }
+
+    private string _arc = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        (double X, double Y) Point(double degrees) =>
+            (Cx + R * Math.Cos(degrees * Math.PI / 180), Cy - R * Math.Sin(degrees * Math.PI / 180));
+
+        var (x1, y1) = Point(From);
+        var (x2, y2) = Point(To);
+        var large = Math.Abs(To - From) > 180 ? 1 : 0;
+        // против часовой на чертеже — это обратный обход в координатах SVG
+        var sweep = To > From ? 0 : 1;
+        _arc = $"M{SketchDim.F(x1)},{SketchDim.F(y1)} A{SketchDim.F(R)},{SketchDim.F(R)} 0 {large} {sweep} {SketchDim.F(x2)},{SketchDim.F(y2)}";
+    }
+}

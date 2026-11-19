@@ -1,0 +1,23 @@
+@* Профиль точёной поверхности: радиус пластины r за каждый оборот смещается на подачу f и оставляет гребешки высотой Rz *@
+<Sketch>
+    <path class="sk-part" d="M40,125.7 A50,50 0 0 0 110,125.7 A50,50 0 0 0 180,125.7 A50,50 0 0 0 250,125.7 L250,185 L40,185 Z" />
+
+    @* пластина в одном из положений *@
+    <circle class="sk-tool @(Active == "r" ? "active" : null)" cx="145" cy="90" r="50" />
+    <path class="sk-thin" d="M140,90 L150,90 M145,85 L145,95" />
+    <SketchDim X1="145" Y1="90" X2="109.6" Y2="54.6" StartArrow="false" Label="r" LabelX="134" LabelY="64" Active="@(Active == "r")" />
+
+    <path class="sk-thin" d="M75,140 L75,172 M145,140 L145,172" />
+    <SketchDim X1="75" Y1="167" X2="145" Y2="167" Label="f" LabelX="110" LabelY="161" Active="@(Active == "f")" />
+
+    <path class="sk-thin" d="M180,125.7 L285,125.7 M215,140 L285,140" />
+    <SketchDim X1="278" Y1="125.7" X2="278" Y2="140" Outside="true" Label="Rz" LabelX="278" LabelY="106" Active="@(Active == "rz")" />
+
+    <text x="150" y="16" text-anchor="middle">подача за оборот →</text>
+</Sketch>
+
+@code
+{
+    /// <summary> Подсвечиваемый размер: r, f или rz. </summary>
+    [Parameter] public string? Active { get; set; }
+}

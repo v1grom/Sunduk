@@ -1,0 +1,59 @@
+@* Размерная линия со стрелками и подписью. Короткие размеры (Outside) рисуются со стрелками снаружи *@
+<g class="sk-dim @(Active ? "active" : null)">
+    <line x1="@F(_a.X)" y1="@F(_a.Y)" x2="@F(_b.X)" y2="@F(_b.Y)" />
+    <path d="@_arrows" />
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <g><text x="@F(LabelX)" y="@F(LabelY)" text-anchor="@Anchor">@Label</text></g>
+    }
+</g>
+
+@code
+{
+    [Parameter] public double X1 { get; set; }
+    [Parameter] public double Y1 { get; set; }
+    [Parameter] public double X2 { get; set; }
+    [Parameter] public double Y2 { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public double LabelX { get; set; }
+    [Parameter] public double LabelY { get; set; }
+    [Parameter] public string Anchor { get; set; } = "middle";
+    [Parameter] public bool Active { get; set; }
+
+    /// <summary> Стрелки снаружи, линия выходит за выносные: для размеров короче стрелок. </summary>
+    [Parameter] public bool Outside { get; set; }
+
+    /// <summary> Стрелка у первой точки; без неё — радиус от центра. </summary>
+    [Parameter] public bool StartArrow { get; set; } = true;
+
+    private const double ArrowLength = 7;
+    private const double ArrowHalfWidth = 2.5;
+    private const double OutsideTail = 12;
+
+    private (double X, double Y) _a, _b;
+    private string _arrows = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        var length = Math.Sqrt((X2 - X1) * (X2 - X1) + (Y2 - Y1) * (Y2 - Y1));
+        if (length == 0) return;
+        // единичный вектор от первой точки ко второй и нормаль к нему
+        var (ux, uy) = ((X2 - X1) / length, (Y2 - Y1) / length);
+        var (nx, ny) = (-uy, ux);
+        var inward = Outside ? -1 : 1;
+
+        string Arrow(double x, double y, double dirX, double dirY)
+        {
+            var bx = x + dirX * ArrowLength * inward;
+            var by = y + dirY * ArrowLength * inward;
+            return $"M{F(x)},{F(y)} L{F(bx + nx * ArrowHalfWidth)},{F(by + ny * ArrowHalfWidth)} L{F(bx - nx * ArrowHalfWidth)},{F(by - ny * ArrowHalfWidth)} Z ";
+        }
+
+        _arrows = (StartArrow ? Arrow(X1, Y1, ux, uy) : string.Empty) + Arrow(X2, Y2, -ux, -uy);
+        var tail = Outside ? OutsideTail : 0;
+        _a = (X1 - ux * tail, Y1 - uy * tail);
+        _b = (X2 + ux * tail, Y2 + uy * tail);
+    }
+
+    internal static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+}

@@ -24,7 +24,7 @@
     <MudCheckBox T="bool" @bind-Value="Grid.Zigzag" @bind-Value:after="Notify" Label="Змейкой" Dense="true" />
 </MudItem>
 <MudItem xs="12">
-    <MudText Typo="Typo.caption" Color="Color.Secondary">Всего отверстий: @Grid.Count. Отрицательный шаг ведёт сетку в минус по оси.</MudText>
+    <MudText Typo="Typo.caption" Class="mud-text-secondary">Всего отверстий: @Grid.Count. Отрицательный шаг ведёт сетку в минус по оси.</MudText>
 </MudItem>
 
 @code {

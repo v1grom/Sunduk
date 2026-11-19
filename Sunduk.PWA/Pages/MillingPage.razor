@@ -3,7 +3,14 @@
 
 <SectionTabs Section="@NavCatalog.Milling" Tab="@Tab">
     <Content Context="key">
-        <MillingComponent Part="@key" />
+        @if (key == "chamfer")
+        {
+            <MillingChamferComponent />
+        }
+        else
+        {
+            <MillingComponent Part="@key" />
+        }
     </Content>
 </SectionTabs>
 

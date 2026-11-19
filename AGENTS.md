@@ -34,6 +34,12 @@ Run a single test project: `dotnet test Sunduk.Geometry.Tests/Sunduk.Geometry.Te
 - `Sunduk.WebApi` reads SMTP credentials (`FeedbackFrom`/`FeedbackTo`/`FeedbackPass`) from user-secrets (set in CI from repo secrets). Never hardcode or commit them.
 - VPS nginx uses stream module with SNI routing: port 443 → `ssl_preread` → backend per domain (www:8455, test:8456, dt:8444, etc.).
 
+## Sections & calc page style
+
+- All sections/tabs live in `Sunduk.PWA/Infrastructure/State/NavCatalog.cs` (menu, home, tab strip, bottom bar are built from it). Groups: Расчёты / Справочник / Программирование. Renaming or moving an address → add it to `NavCatalog.Moved` (drives redirects in `LegacyRedirects.razor` and migration of saved bottom-bar slots and `nav-usage` counters).
+- Calc tab layout: `MudField` «Параметры» (+ sketch card) → `MudField` «Результат» → `MudAlert` warnings → `NcExample` («Пример программы для Fanuc») → `CalcNote` explanations. Don't use `Color.Secondary` for hint text — it is green (`Success`) in the theme; use `CalcNote` / `mud-text-secondary`.
+- Sketches: inline SVG components in `Components/Sketches` (`Sketch` frame, `SketchDim`, `SketchAngle`, `sk-*` classes in `site.css`) — theme colours, the dimension of the focused field gets `Active` (accent). Angles are drawn from the entered value (chamfers). In SVG path data put a space after the command letter before a Razor expression (`L @F(x)`), otherwise Razor treats `L@F` as an e-mail and leaves it literal.
+
 ## Persistence gotcha
 
 `Sunduk.PWA/Infrastructure/State/MachineRegistry.cs` persists machines/tools in LocalStorage and applies **one-time migrations on load** (`MigrateXxx` methods). Any schema change to `Machine`/`Tool` (or its JSON shape) needs a matching migration or existing users silently lose/misload data. Migrations merge with seeds by `Id` rather than overwriting user edits.

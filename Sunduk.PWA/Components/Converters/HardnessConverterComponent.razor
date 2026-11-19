@@ -33,16 +33,10 @@
                 @foreach (var scale in Scales.Where(s => s != State.HardnessScale))
                 {
                     var converted = Hardness.Convert(State.HardnessScale, scale, Value);
-                    <MudText Typo="Typo.body2" Class="monofield">@Name(scale): @(converted is null ? "—" : $"{Format(scale, converted.Value)} {Unit(scale)}")</MudText>
+                    <MudText Typo="Typo.body2">@Name(scale): @(converted is null ? "—" : $"{Format(scale, converted.Value)} {Unit(scale)}")</MudText>
                 }
             }
         </MudField>
-    </MudItem>
-    <MudItem xs="12">
-        <MudText Typo="Typo.body2" Class="px-1">
-            Перевод приближённый, по сравнительной таблице для нелегированных и низколегированных сталей (DIN EN ISO 18265), между строками — линейная интерполяция.
-            Для чугуна, нержавеющих и цветных сплавов соотношения другие.
-        </MudText>
     </MudItem>
     <MudItem xs="12">
         <MudExpansionPanel Class="rounded-0" Text="Таблица целиком">
@@ -63,6 +57,12 @@
                 </tbody>
             </MudSimpleTable>
         </MudExpansionPanel>
+    </MudItem>
+    <MudItem xs="12">
+        <CalcNote>
+            Перевод приближённый, по сравнительной таблице для нелегированных и низколегированных сталей (DIN EN ISO 18265), между строками — линейная интерполяция.
+            Для чугуна, нержавеющих и цветных сплавов соотношения другие.
+        </CalcNote>
     </MudItem>
 </MudGrid>
 

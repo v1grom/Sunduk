@@ -1,0 +1,106 @@
+@* Фасочная фреза в разрезе, угол рисуется по введённому углу фрезы (размеры — не в масштабе).
+   По контуру: ось стоит от стенки на D (корректор), вершина ниже фаски на Δ.
+   Отверстие: фреза врезается по оси на Z, пока конус не даст диаметр фаски у грани *@
+<Sketch>
+    @if (!Hole)
+    {
+        <path class="sk-part" d="M20,@F(Top) L @F(_p1x),@F(Top) L @F(Wall),@F(_p2y) L @F(Wall),185 L20,185 Z" />
+        <line class="sk-axis" x1="@F(_tipX)" y1="4" x2="@F(_tipX)" y2="@F(_tipY + 50)" />
+        <path class="sk-tool @(Active == "tool" ? "active" : null)" d="@ToolPath" />
+
+        <path class="sk-thin" d="M @F(_p1x),@F(Top) L @F(_p1x),46 M @F(Wall),@F(_p2y) L @F(Wall),46" />
+        <SketchDim X1="@_p1x" Y1="50" X2="@Wall" Y2="50" Outside="@(Wall - _p1x < 22)" Label="b" LabelX="@((_p1x + Wall) / 2)" LabelY="44" Active="@(Active == "width")" />
+
+        <path class="sk-thin" d="M @F(Wall),@F(_p2y) L @F(_p1x - 28),@F(_p2y)" />
+        <SketchDim X1="@(_p1x - 22)" Y1="@Top" X2="@(_p1x - 22)" Y2="@_p2y" Outside="@(_p2y - Top < 22)" Label="h" LabelX="@(_p1x - 32)" LabelY="@((Top + _p2y) / 2 + 4)" />
+
+        <path class="sk-thin" d="M @F(_p1x),@F(Top) L270,@F(Top) M @F(_tipX),@F(_tipY) L270,@F(_tipY) M @F(Wall),@F(_p2y) L @F(_tipX + 34),@F(_p2y)" />
+        <SketchDim X1="@(_tipX + 28)" Y1="@_p2y" X2="@(_tipX + 28)" Y2="@_tipY" Outside="true" Label="Δ" LabelX="@(_tipX + 36)" LabelY="@(_tipY - 2)" Anchor="start" Active="@(Active == "over")" />
+        <SketchDim X1="262" Y1="@Top" X2="262" Y2="@_tipY" Label="Z" LabelX="270" LabelY="@((Top + _tipY) / 2 + 4)" Anchor="start" />
+
+        <SketchDim X1="@Wall" Y1="@(_tipY + 38)" X2="@_tipX" Y2="@(_tipY + 38)" Outside="@(_tipX - Wall < 22)" Label="D" LabelX="@(_tipX + 18)" LabelY="@(_tipY + 42)" Anchor="start" />
+
+        <SketchAngle Cx="@_tipX" Cy="@_tipY" R="22" From="@(90 - _half)" To="@(90 + _half)" Label="φ" LabelX="@_tipX" LabelY="@(_tipY - 32)" Active="@(Active == "angle")" />
+        <g><text x="@F(_tipX - 4)" y="@F(_tipY + 22)" text-anchor="end" class="@(Active == "tip" ? "active" : null)">d0</text></g>
+    }
+    else
+    {
+        <path class="sk-part" d="M10,@F(Top) L @F(HoleLeft - _b),@F(Top) L @F(HoleLeft),@F(Top + _h) L @F(HoleLeft),185 L10,185 Z" />
+        <path class="sk-part" d="M290,@F(Top) L @F(HoleRight + _b),@F(Top) L @F(HoleRight),@F(Top + _h) L @F(HoleRight),185 L290,185 Z" />
+        <line class="sk-axis" x1="150" y1="4" x2="150" y2="196" />
+        <path class="sk-tool @(Active == "tool" ? "active" : null)" d="@ToolPath" />
+
+        <path class="sk-thin" d="M @F(HoleLeft - _b),@F(Top) L @F(HoleLeft - _b),24 M @F(HoleRight + _b),@F(Top) L @F(HoleRight + _b),24" />
+        <SketchDim X1="@(HoleLeft - _b)" Y1="28" X2="@(HoleRight + _b)" Y2="28" Label="Dфаски" LabelX="150" LabelY="22" />
+
+        <path class="sk-thin" d="M @F(HoleRight),@F(Top + _h) L @F(HoleRight),46" />
+        <SketchDim X1="@HoleRight" Y1="50" X2="@(HoleRight + _b)" Y2="50" Outside="true" Label="b" LabelX="@(HoleRight + _b + 16)" LabelY="54" Anchor="start" Active="@(Active == "width")" />
+
+        <path class="sk-thin" d="M @F(HoleLeft - _b),@F(Top) L @F(HoleRight + _b),@F(Top) M150,@F(_tipY) L172,@F(_tipY)" />
+        <SketchDim X1="166" Y1="@Top" X2="166" Y2="@_tipY" Outside="@(_tipY - Top < 22)" Label="Z" LabelX="174" LabelY="@((Top + _tipY) / 2 + 4)" Anchor="start" />
+
+        <SketchDim X1="@HoleLeft" Y1="186" X2="@HoleRight" Y2="186" Label="Dотв" LabelX="150" LabelY="181" Active="@(Active == "hole")" />
+
+        <SketchAngle Cx="150" Cy="@_tipY" R="18" From="@(90 - _half)" To="@(90 + _half)" Label="φ" LabelX="@(150 - 26)" LabelY="@(_tipY - 6)" Active="@(Active == "angle")" />
+        <g><text x="150" y="@F(_tipY + 15)" text-anchor="middle" class="@(Active == "tip" ? "active" : null)">d0</text></g>
+    }
+</Sketch>
+
+@code
+{
+    /// <summary> Фаска на отверстии (врезание по оси) вместо фаски по контуру. </summary>
+    [Parameter] public bool Hole { get; set; }
+
+    /// <summary> Угол фрезы при вершине, °; рисуется в пределах 30…150°, без угла — 90°. </summary>
+    [Parameter] public double ToolAngle { get; set; }
+
+    /// <summary> Подсвечиваемый размер: width, angle, tip, over, hole или tool. </summary>
+    [Parameter] public string? Active { get; set; }
+
+    private const double Top = 60;
+    private const double Wall = 170;
+    private const double HoleLeft = 110;
+    private const double HoleRight = 190;
+
+    private double _half, _tan, _b, _h, _p1x, _p2y, _tipX, _tipY;
+
+    private string ToolPath { get; set; } = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        var angle = ToolAngle > 0 && ToolAngle < 180 ? Math.Clamp(ToolAngle, 30, 150) : 90;
+        _half = angle / 2;
+        _tan = Math.Tan(_half * Math.PI / 180);
+        var sin = Math.Sin(_half * Math.PI / 180);
+        var cos = Math.Cos(_half * Math.PI / 180);
+
+        if (!Hole)
+        {
+            // грань фаски одной длины при любом угле: ширина b и высота h меняются вместе с углом
+            const double face = 44, over = 12;
+            _b = face * sin;
+            _h = face * cos;
+            _p1x = Wall - _b;
+            _p2y = Top + _h;
+            _tipY = _p2y + over;
+            _tipX = Wall + over * _tan;
+        }
+        else
+        {
+            const double face = 30;
+            _b = face * sin;
+            _h = face * cos;
+            _tipY = Top + _h + (150 - HoleLeft) / _tan;
+            _tipX = 150;
+        }
+
+        // конус фрезы — до высоты, где он не шире рисунка, выше — хвостовик
+        var spread = Math.Min(Hole ? 125 : 110, (_tipY - 30) * _tan);
+        var coneTop = _tipY - spread / _tan;
+        var shank = Math.Min(Hole ? 40 : 32, spread * 0.6);
+        ToolPath = $"M{F(_tipX - spread)},{F(coneTop)} L{F(_tipX)},{F(_tipY)} L{F(_tipX + spread)},{F(coneTop)} Z " +
+                   $"M{F(_tipX - shank)},{F(coneTop)} L{F(_tipX - shank)},6 M{F(_tipX + shank)},{F(coneTop)} L{F(_tipX + shank)},6";
+    }
+
+    private static string F(double value) => SketchDim.F(value);
+}

@@ -95,4 +95,40 @@ public class HoleGridTests
         Assert.Equal(6, loaded.Holes.Count);
         Assert.Null(Assert.IsType<MillingHighSpeedDrillingSequence>(read.Document.Program[1]).Grid);
     }
+
+    [Fact]
+    public void EdgeChamfer_SharpTool90_FollowsWidth()
+    {
+        // фаска 1×45° острой фрезой 90°, вершина ниже фаски на 0.5: Z = 1 + 0.5, ось от стенки 0.5·tg45°
+        var r = MillingMath.EdgeChamfer(90, 0, 1, 0.5)!.Value;
+        Assert.Equal(1.5, r.Depth, 4);
+        Assert.Equal(0.5, r.Offset, 4);
+        Assert.Equal(1, r.Height, 4);
+        Assert.Equal(3, r.MaxDiameter, 4);
+        Assert.Equal(2, r.MeanDiameter, 4);
+    }
+
+    [Fact]
+    public void EdgeChamfer_FlatTipAndSpotAngle()
+    {
+        // фреза 60° с площадкой Ø2, ширина 1: высота 1/tg30°, ось от стенки 1 + 0.3·tg30°
+        var tan = Math.Tan(30 * Math.PI / 180);
+        var r = MillingMath.EdgeChamfer(60, 2, 1, 0.3)!.Value;
+        Assert.Equal(1 / tan, r.Height, 4);
+        Assert.Equal(1 / tan + 0.3, r.Depth, 4);
+        Assert.Equal(1 + 0.3 * tan, r.Offset, 4);
+        Assert.Null(MillingMath.EdgeChamfer(180, 0, 1, 0));
+        Assert.Null(MillingMath.EdgeChamfer(90, 0, 0, 0));
+    }
+
+    [Fact]
+    public void HoleChamfer_PlungeDepth()
+    {
+        // отверстие Ø10, фаска 1 на сторону, острая 90°: верх фаски Ø12, глубина 6
+        Assert.Equal(6, MillingMath.HoleChamferDepth(90, 0, 10, 1), 4);
+        // с площадкой Ø4: (12 − 4) / 2
+        Assert.Equal(4, MillingMath.HoleChamferDepth(90, 4, 10, 1), 4);
+        // площадка не входит в отверстие
+        Assert.True(double.IsNaN(MillingMath.HoleChamferDepth(90, 10, 10, 1)));
+    }
 }

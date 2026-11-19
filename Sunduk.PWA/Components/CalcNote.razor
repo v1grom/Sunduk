@@ -1,0 +1,7 @@
+@* Пояснение к расчёту: формула, допущения, где расчёт не годится. Один стиль для всех разделов — приглушённый текст под результатом *@
+<MudText Typo="Typo.body2" Class="calc-note px-1">@ChildContent</MudText>
+
+@code
+{
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

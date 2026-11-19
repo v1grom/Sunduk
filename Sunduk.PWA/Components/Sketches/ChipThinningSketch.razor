@@ -1,0 +1,28 @@
+@* Вид сверху на боковое фрезерование: фреза диаметром D снимает полосу шириной ae, подача — вверх.
+   При ae меньше половины D зуб выходит из реза раньше и стружка тоньше подачи на зуб *@
+<Sketch>
+    @* заготовка: впереди фрезы стенка на ae левее, позади — обработанная стенка по краю фрезы *@
+    <path class="sk-part" d="M165,6 L165,46.4 A70,70 0 0 1 190,100 L190,194 L292,194 L292,6 Z" />
+    <circle class="sk-tool @(Active == "diameter" ? "active" : null)" cx="120" cy="100" r="70" />
+    <path class="sk-thin" d="M114,100 L126,100 M120,94 L120,106" />
+    <path class="sk-thin" d="M138,50 A55,55 0 0 0 102,48" />
+    <path class="sk-thin" d="M102,48 L108,44 M102,48 L108,53" />
+
+    <SketchDim X1="50" Y1="100" X2="190" Y2="100" Label="D" LabelX="84" LabelY="94" Active="@(Active == "diameter")" />
+
+    <path class="sk-thin" d="M165,46 L165,18 M190,100 L190,18" />
+    <SketchDim X1="165" Y1="22" X2="190" Y2="22" Label="ae" LabelX="177.5" LabelY="15" Active="@(Active == "width")" />
+
+    <g class="sk-dim @(Active == "feed" ? "active" : null)">
+        <line x1="28" y1="150" x2="28" y2="60" />
+        <path d="M28,56 L24,66 L32,66 Z" />
+        <text x="28" y="48" text-anchor="middle">fz</text>
+    </g>
+    <text x="232" y="150" text-anchor="middle">заготовка</text>
+</Sketch>
+
+@code
+{
+    /// <summary> Подсвечиваемый размер: diameter, width или feed. </summary>
+    [Parameter] public string? Active { get; set; }
+}

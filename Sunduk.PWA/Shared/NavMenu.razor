@@ -1,21 +1,25 @@
 ﻿@inject NavigationManager Navigation
 <MudNavMenu>
-    @foreach (var root in NavCatalog.Roots)
+    @foreach (var group in NavCatalog.Groups)
     {
-        var children = NavCatalog.ChildrenOf(root.Href);
-        if (children.Count == 0)
+        <MudText Typo="Typo.overline" Class="nav-group-title px-4 pt-3 d-block">@NavCatalog.GroupTitle(group.Key)</MudText>
+        @foreach (var root in group)
         {
-            <MudNavLink Href="@root.Href" Match="NavLinkMatch.Prefix" Icon="@root.Icon">@root.Title</MudNavLink>
-        }
-        else
-        {
-            @* Раздел с вкладками: сам раздел открывает первую вкладку, группа раскрыта, когда в ней находится пользователь *@
-            <MudNavGroup Title="@root.Title" Icon="@root.Icon" Expanded="@IsInside(root)">
-                @foreach (var child in children)
-                {
-                    <MudNavLink Href="@child.Href" Match="NavLinkMatch.All" Icon="@child.Icon">@child.Title</MudNavLink>
-                }
-            </MudNavGroup>
+            var children = NavCatalog.ChildrenOf(root.Href);
+            if (children.Count == 0)
+            {
+                <MudNavLink Href="@root.Href" Match="NavLinkMatch.Prefix" Icon="@root.Icon">@root.Title</MudNavLink>
+            }
+            else
+            {
+                @* Раздел с вкладками: сам раздел открывает первую вкладку, группа раскрыта, когда в ней находится пользователь *@
+                <MudNavGroup Title="@root.Title" Icon="@root.Icon" Expanded="@IsInside(root)">
+                    @foreach (var child in children)
+                    {
+                        <MudNavLink Href="@child.Href" Match="NavLinkMatch.All" Icon="@child.Icon">@child.Title</MudNavLink>
+                    }
+                </MudNavGroup>
+            }
         }
     }
 </MudNavMenu>

@@ -30,100 +30,9 @@
                 </MudGrid>
             </MudField>
         </MudItem>
-        <MudHidden Breakpoint="Breakpoint.Xs">
-            <MudItem xs="12" sm="6">
-                <MudCard Elevation="0" Outlined="true" Class="mt-1 mb-2 rounded-0">
-                    <MudCardContent>
-                        @if (CurrentImage == Images.ExternalChamfer)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/ext_chamfer_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.InternalChamfer)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/int_chamfer_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.ExternalChamferAngle)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/ext_chamfer_angle_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.ExternalChamferSize)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/ext_chamfer_size_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.ExternalStartDiameter)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/ext_chamfer_diam_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.ExternalEndDiameter)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/ext_part_diam_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.ExternalToolRadius)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/ext_tool_radius_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.InternalChamferAngle)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/int_chamfer_angle_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.InternalChamferSize)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/int_chamfer_size_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.InternalStartDiameter)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/int_chamfer_diam_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.InternalEndDiameter)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/int_part_diam_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                        @if (CurrentImage == Images.InternalToolRadius)
-                        {
-                            <center>
-                                <ThemedSvg Src="/img/stuffimages/chamfer/int_tool_radius_n.svg" Width="@_imgWidth" Height="@_imgHeigth" />
-                            </center>
-                        }
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-            <div>
-                <ThemedSvg Src="/img/stuffimages/chamfer/ext_chamfer_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/int_chamfer_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/ext_chamfer_angle_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/ext_chamfer_size_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/ext_chamfer_diam_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/ext_part_diam_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/ext_tool_radius_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/int_chamfer_angle_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/int_chamfer_size_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/int_chamfer_diam_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/int_part_diam_n.svg" Width="0" Height="0" />
-                <ThemedSvg Src="/img/stuffimages/chamfer/int_tool_radius_n.svg" Width="0" Height="0" />
-            </div>
-        </MudHidden>
+        <MudItem xs="12" sm="6">
+            <TurningChamferSketch Internal="@(ChamferType == Chamfer.Internal)" Angle="@Angle" Active="@SketchActive" />
+        </MudItem>
         <MudItem xs="12" sm="12">
             <MudField Label="Расчет" Variant="Variant.Filled" Underline="false" Class="mt-n1"
             @onfocusout="(() => CurrentImage = ChamferType == Chamfer.External ? Images.ExternalChamfer : Images.InternalChamfer)">
@@ -216,9 +125,6 @@
 @code
 {
     [Inject] IJSRuntime JS { get; set; } = default!;
-
-    readonly int _imgHeigth = 249;
-    readonly int _imgWidth = 270;
 
     bool calcStartDiam { get => State.CalcStartDiam; set => State.CalcStartDiam = value; }
     bool showClassicChamfer { get => State.ShowClassicChamfer; set => State.ShowClassicChamfer = value; }
@@ -324,6 +230,17 @@
     };
     //public enum ImageType { Diameter, ToolRadius, ChamferAngle, ChamferSize };
     public Images CurrentImage { get => State.CurrentImage; set => State.CurrentImage = value; }
+
+    /// <summary> Размер на эскизе для поля в фокусе: картинки прежней версии сопоставлены размерам эскиза. </summary>
+    private string? SketchActive => CurrentImage switch
+    {
+        Images.ExternalChamferSize or Images.InternalChamferSize => "size",
+        Images.ExternalChamferAngle or Images.InternalChamferAngle => "angle",
+        Images.ExternalStartDiameter or Images.InternalStartDiameter => "start",
+        Images.ExternalEndDiameter or Images.InternalEndDiameter => "end",
+        Images.ExternalToolRadius or Images.InternalToolRadius => "r",
+        _ => null,
+    };
 
     public string _ChamferEndDiameter
     {

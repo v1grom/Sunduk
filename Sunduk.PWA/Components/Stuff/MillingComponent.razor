@@ -2,72 +2,102 @@
 <MudGrid Spacing="1" Class="pa-2">
     @if (Part == "chip-thinning")
     {
-    <MudItem xs="12" md="6" lg="4">
-        <MudField Label="Утонение стружки"Variant="Variant.Filled" Underline="false" Class="mt-1">
-            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningDiameter" T="string" Label="Диаметр фрезы"
+    <MudItem xs="12" sm="6">
+        <MudField Label="Параметры" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningDiameter" T="string" Label="Диаметр фрезы" @onfocus="@(() => _active = "diameter")"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
-            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningWidth" T="string" Label="Ширина резания ae"
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningWidth" T="string" Label="Ширина резания ae" @onfocus="@(() => _active = "width")"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
-            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningFeed" T="string" Label="Паспортная подача"
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.ThinningFeed" T="string" Label="Паспортная подача" @onfocus="@(() => _active = "feed")"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм/зуб" Immediate="true" Margin="Margin.Dense" />
-            <MudText Typo="Typo.body2" Class="mt-3 monofield">@ThinningResult</MudText>
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">
-                При ширине резания меньше половины диаметра стружка тоньше подачи на зуб: hmax = fz·2·√(ae·(D − ae))/D. Чтобы зуб резал, а не тёр, подачу поднимают до паспортной толщины стружки.
-            </MudText>
         </MudField>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <ChipThinningSketch Active="@_active" />
+    </MudItem>
+    <MudItem xs="12">
+        <MudField Label="Результат" Variant="Variant.Filled" Underline="false">
+            <MudText Typo="Typo.body2">@ThinningResult</MudText>
+        </MudField>
+    </MudItem>
+    <MudItem xs="12">
+        <CalcNote>
+            При ширине резания меньше половины диаметра стружка тоньше подачи на зуб: hmax = fz·2·√(ae·(D − ae))/D. Чтобы зуб резал, а не тёр, подачу поднимают до паспортной толщины стружки.
+        </CalcNote>
     </MudItem>
     }
     @if (Part == "high-feed")
     {
-    <MudItem xs="12" md="6" lg="4">
-        <MudField Label="High feed: подача"Variant="Variant.Filled" Underline="false" Class="mt-1">
+    <MudItem xs="12" sm="6">
+        <MudField Label="Параметры" Variant="Variant.Filled" Underline="false" Class="mt-1">
             <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedDiameter" T="string" Label="Диаметр фрезы"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
             <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedWidth" T="string" Label="Ширина резания ae"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
-            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedAngle" T="string" Label="Угол в плане κ"
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedAngle" T="string" Label="Угол в плане κ" @onfocus="@(() => _active = "angle")"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="°" Immediate="true" Margin="Margin.Dense" />
-            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedFz" T="string" Label="Паспортная подача"
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedFz" T="string" Label="Паспортная подача" @onfocus="@(() => _active = "feed")"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм/зуб" Immediate="true" Margin="Margin.Dense" />
             <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedTeeth" T="string" Label="Число зубьев"
                           InputMode="@(InputMode.@numeric)" Immediate="true" Margin="Margin.Dense" />
             <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.HighFeedSpeed" T="string" Label="Обороты"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="об/мин" Immediate="true" Margin="Margin.Dense" />
-            <MudText Typo="Typo.body2" Class="mt-3 monofield" Style="white-space: pre-line;">@HighFeedResult</MudText>
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">
-                У фрез с малым углом в плане стружка тоньше подачи на зуб: hmax = fz·sin κ (при 15° — около 26%), поэтому паспортные подачи большие. Паспортная подача уже учитывает угол, при малой ae её поднимают ещё и на радиальное утонение. Для круглых пластин угол в плане меняется с глубиной — там сверяйтесь с каталогом.
-            </MudText>
         </MudField>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <HighFeedSketch Active="@_active" />
+    </MudItem>
+    <MudItem xs="12">
+        <MudField Label="Результат" Variant="Variant.Filled" Underline="false">
+            <MudText Typo="Typo.body2" Style="white-space: pre-line;">@HighFeedResult</MudText>
+        </MudField>
+    </MudItem>
+    <MudItem xs="12">
+        <CalcNote>
+            У фрез с малым углом в плане стружка тоньше подачи на зуб: hmax = fz·sin κ (при 15° — около 26%), поэтому паспортные подачи большие. Паспортная подача уже учитывает угол, при малой ae её поднимают ещё и на радиальное утонение. Для круглых пластин угол в плане меняется с глубиной — там сверяйтесь с каталогом.
+        </CalcNote>
     </MudItem>
     }
     @if (Part == "ball")
     {
-    <MudItem xs="12" md="6" lg="4">
-        <MudField Label="Сферическая фреза: эффективный диаметр"Variant="Variant.Filled" Underline="false" Class="mt-1">
-            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallDiameter" T="string" Label="Диаметр фрезы"
+    <MudItem xs="12" sm="6">
+        <MudField Label="Эффективный диаметр" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallDiameter" T="string" Label="Диаметр фрезы" @onfocus="@(() => _active = "diameter")"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
-            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallDepth" T="string" Label="Глубина резания ap"
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallDepth" T="string" Label="Глубина резания ap" @onfocus="@(() => _active = "depth")"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
-            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallSpeed" T="string" Label="Скорость резания"
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="State.BallSpeed" T="string" Label="Скорость резания" @onfocus="@(() => _active = null)"
                           InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="м/мин" Immediate="true" Margin="Margin.Dense" />
-            <MudText Typo="Typo.body2" Class="mt-3 monofield">@BallResult</MudText>
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">
-                На малой глубине сфера режет диаметром Dэф = 2·√(ap·(D − ap)), а не полным — обороты считаются по нему. Расчёт для фрезы, стоящей перпендикулярно поверхности.
-            </MudText>
         </MudField>
     </MudItem>
-    <MudItem xs="12" md="6" lg="4">
-        <MudField Label="Сферическая фреза: гребешок"Variant="Variant.Filled" Underline="false" Class="mt-1">
-            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="ScallopDiameter" T="string" Label="Диаметр фрезы"
-                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
-            <MudTextField Class="monofield" Variant="Variant.Text" Value="State.ScallopStep" ValueChanged="@((string v) => SetScallop(false, v))" T="string" Label="Шаг между проходами"
-                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
-            <MudTextField Class="monofield" Variant="Variant.Text" Value="State.ScallopHeight" ValueChanged="@((string v) => SetScallop(true, v))" T="string" Label="Высота гребешка"
-                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
-                Вводится шаг или высота гребешка — второе считается: h = R − √(R² − шаг²/4). Для плоской поверхности; на наклонной стенке гребешок при том же шаге по высоте больше.
-            </MudText>
+    <MudItem xs="12" sm="6">
+        <BallSketch Active="@_active" />
+    </MudItem>
+    <MudItem xs="12">
+        <MudField Label="Результат" Variant="Variant.Filled" Underline="false">
+            <MudText Typo="Typo.body2">@BallResult</MudText>
         </MudField>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <MudField Label="Гребешок" Variant="Variant.Filled" Underline="false" Class="mt-1">
+            <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="ScallopDiameter" T="string" Label="Диаметр фрезы" @onfocus="@(() => _active = "s-diameter")"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" Value="State.ScallopStep" ValueChanged="@((string v) => SetScallop(false, v))" T="string" Label="Шаг между проходами" @onfocus="@(() => _active = "step")"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
+            <MudTextField Class="monofield" Variant="Variant.Text" Value="State.ScallopHeight" ValueChanged="@((string v) => SetScallop(true, v))" T="string" Label="Высота гребешка" @onfocus="@(() => _active = "height")"
+                          InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
+        </MudField>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <ScallopSketch Active="@_active" />
+    </MudItem>
+    <MudItem xs="12">
+        <CalcNote>
+            На малой глубине сфера режет диаметром Dэф = 2·√(ap·(D − ap)), а не полным — обороты считаются по нему. Расчёт для фрезы, стоящей перпендикулярно поверхности.
+        </CalcNote>
+        <CalcNote>
+            Гребешок: вводится шаг или высота — второе считается, h = R − √(R² − шаг²/4). Для плоской поверхности; на наклонной стенке гребешок при том же шаге по высоте больше.
+        </CalcNote>
     </MudItem>
     }
 </MudGrid>
@@ -76,6 +106,9 @@
 {
     /// <summary> Какие карточки показать: chip-thinning, high-feed или ball (сферическая фреза). </summary>
     [Parameter] public string Part { get; set; } = "chip-thinning";
+
+    /// <summary> Размер на эскизе, соответствующий полю в фокусе. </summary>
+    string? _active;
 
     string ThinningResult
     {

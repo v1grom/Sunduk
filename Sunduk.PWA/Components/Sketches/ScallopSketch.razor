@@ -1,0 +1,21 @@
+@* Два соседних прохода сферической фрезы со смещением на шаг оставляют между собой гребешок высотой h *@
+<Sketch>
+    <path class="sk-part" d="M60,113.2 A60,60 0 0 0 150,124.7 A60,60 0 0 0 240,113.2 L240,186 L60,186 Z" />
+    <circle class="sk-tool @(Active == "s-diameter" ? "active" : null)" cx="110" cy="80" r="60" />
+    <circle class="sk-tool @(Active == "s-diameter" ? "active" : null)" cx="190" cy="80" r="60" />
+    <path class="sk-thin" d="M105,80 L115,80 M110,75 L110,85 M185,80 L195,80 M190,75 L190,85" />
+
+    <SketchDim X1="50" Y1="80" X2="110" Y2="80" StartArrow="true" Label="D/2" LabelX="78" LabelY="74" Active="@(Active == "s-diameter")" />
+
+    <path class="sk-thin" d="M110,140 L110,172 M190,140 L190,172" />
+    <SketchDim X1="110" Y1="167" X2="190" Y2="167" Label="шаг" LabelX="150" LabelY="161" Active="@(Active == "step")" />
+
+    <path class="sk-thin" d="M150,124.7 L282,124.7 M190,140 L282,140" />
+    <SketchDim X1="272" Y1="124.7" X2="272" Y2="140" Outside="true" Label="h" LabelX="272" LabelY="106" Active="@(Active == "height")" />
+</Sketch>
+
+@code
+{
+    /// <summary> Подсвечиваемый размер: s-diameter, step или height. </summary>
+    [Parameter] public string? Active { get; set; }
+}

@@ -4,29 +4,30 @@
         <MudField Label="Режим" Variant="Variant.Filled" Underline="false" Class="mt-1">
             <MudGrid Spacing="0">
                 <MudItem xs="12">
-                    <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="InsertRadius" T="string" Label="Радиус пластины"
+                    <MudTextField Class="monofield" Variant="Variant.Text" @bind-Value="InsertRadius" T="string" Label="Радиус пластины" @onfocus="@(() => _active = "r")"
                                   InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм" Immediate="true" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12">
-                    <MudTextField Class="monofield" Variant="Variant.Text" Value="State.Feed" ValueChanged="@((string v) => Set(RoughnessState.Source.Feed, v))" T="string" Label="Подача"
+                    <MudTextField Class="monofield" Variant="Variant.Text" Value="State.Feed" ValueChanged="@((string v) => Set(RoughnessState.Source.Feed, v))" T="string" Label="Подача" @onfocus="@(() => _active = "f")"
                                   InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мм/об" Immediate="true" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+        </MudField>
+        <MudField Label="Шероховатость" Variant="Variant.Filled" Underline="false" Class="mt-2">
+            <MudGrid Spacing="0">
+                <MudItem xs="12">
+                    <MudTextField Class="monofield" Variant="Variant.Text" Value="State.Ra" ValueChanged="@((string v) => Set(RoughnessState.Source.Ra, v))" T="string" Label="Ra" @onfocus="@(() => _active = "rz")"
+                                  InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Class="monofield" Variant="Variant.Text" Value="State.Rz" ValueChanged="@((string v) => Set(RoughnessState.Source.Rz, v))" T="string" Label="Rz" @onfocus="@(() => _active = "rz")"
+                                  InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
                 </MudItem>
             </MudGrid>
         </MudField>
     </MudItem>
     <MudItem xs="12" sm="6">
-        <MudField Label="Шероховатость" Variant="Variant.Filled" Underline="false" Class="mt-1">
-            <MudGrid Spacing="0">
-                <MudItem xs="12">
-                    <MudTextField Class="monofield" Variant="Variant.Text" Value="State.Ra" ValueChanged="@((string v) => Set(RoughnessState.Source.Ra, v))" T="string" Label="Ra"
-                                  InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudTextField Class="monofield" Variant="Variant.Text" Value="State.Rz" ValueChanged="@((string v) => Set(RoughnessState.Source.Rz, v))" T="string" Label="Rz"
-                                  InputMode="@(InputMode.@decimal)" Adornment="Adornment.End" AdornmentText="мкм" Immediate="true" Margin="Margin.Dense" />
-                </MudItem>
-            </MudGrid>
-        </MudField>
+        <RoughnessSketch Active="@_active" />
     </MudItem>
     @if (Problem is not null)
     {
@@ -34,13 +35,6 @@
             <MudAlert Class="rounded-0" Severity="Severity.Warning" Icon="@Icons.Material.Filled.WarningAmber">@Problem</MudAlert>
         </MudItem>
     }
-    <MudItem xs="12">
-        <MudField Label="Как считать" Variant="Variant.Filled" Underline="false">
-            <MudText Typo="Typo.body2">Вводится любое из трёх полей — подача, Ra или Rz; два других считаются от него и радиуса пластины.</MudText>
-            <MudText Typo="Typo.body2" Class="mt-2">Расчёт геометрический: высота гребешка, который оставляет радиус пластины, Rz = r − √(r² − f²/4) ≈ f²/8r, и Ra ≈ 0.26·Rz. Это нижняя граница — вибрации, износ, нарост и материал делают реальную поверхность грубее.</MudText>
-            <MudText Typo="Typo.body2" Class="mt-2">Для пластин Wiper расчёт не годится: производители указывают при той же подаче примерно вдвое меньшую Ra.</MudText>
-        </MudField>
-    </MudItem>
     <MudItem xs="12">
         <MudField Label="Подача под типовые Ra" Variant="Variant.Filled" Underline="false">
             <MudSimpleTable Dense="true" Elevation="0" Class="monofield" Style="background: transparent;">
@@ -68,10 +62,18 @@
             </MudSimpleTable>
         </MudField>
     </MudItem>
+    <MudItem xs="12">
+        <CalcNote>Вводится любое из трёх полей — подача, Ra или Rz; два других считаются от него и радиуса пластины.</CalcNote>
+        <CalcNote>Расчёт геометрический: высота гребешка, который оставляет радиус пластины, Rz = r − √(r² − f²/4) ≈ f²/8r, и Ra ≈ 0.26·Rz. Это нижняя граница — вибрации, износ, нарост и материал делают реальную поверхность грубее.</CalcNote>
+        <CalcNote>Для пластин Wiper расчёт не годится: производители указывают при той же подаче примерно вдвое меньшую Ra.</CalcNote>
+    </MudItem>
 </MudGrid>
 
 @code
 {
+    /// <summary> Размер на эскизе, соответствующий полю в фокусе. </summary>
+    string? _active;
+
     static readonly double[] TableRadii = { 0.2, 0.4, 0.8, 1.2, 1.6 };
     static readonly double[] TableRa = { 6.3, 3.2, 1.6, 0.8, 0.4 };
 

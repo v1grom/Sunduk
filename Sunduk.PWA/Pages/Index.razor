@@ -1,12 +1,22 @@
 ﻿@page "/"
-<MudGrid Spacing="1" Class="d-flex pa-2" Justify="Justify.FlexStart">
-    @foreach (var root in NavCatalog.Roots)
+@* Группы плиток разделены линией без подписей: подписи групп есть в боковом меню *@
+<div class="pa-2">
+    @foreach (var group in NavCatalog.Groups)
     {
-        <MudItem xs="6" md="4" lg="4" xl="2">
-            <SectionButton Label="@root.Title" Link="@root.Href" Icon="@root.Icon" />
-        </MudItem>
+        @if (group.Key != NavCatalog.Groups[0].Key)
+        {
+            <MudDivider Class="my-3" />
+        }
+        <MudGrid Spacing="1" Class="d-flex" Justify="Justify.FlexStart">
+            @foreach (var root in group)
+            {
+                <MudItem xs="6" md="4" lg="4" xl="2">
+                    <SectionButton Label="@root.Title" Link="@root.Href" Icon="@root.Icon" />
+                </MudItem>
+            }
+        </MudGrid>
     }
-</MudGrid>
+</div>
 
 @code {
     [CascadingParameter(Name = "ExperimantalMode")]

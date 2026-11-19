@@ -79,41 +79,18 @@
             </MudItem>
         }
 
-        <MudItem xs="12">
-            <MudField Label="Параметры резьбы" Variant="Variant.Filled" Underline="false">
-                <MudGrid Spacing="0">
-                    <MudHidden Breakpoint="Breakpoint.Xs">
-                        <MudItem xs="12" sm="3" md="2">
-                            <MudRadioGroup @bind-Value="@ThreadType" Class="ml-0 d-flex justify-center">
-                                <div>
-                                    <div class="d-block">
-                                        <MudRadio Value="@(CuttingType.External)" Color="Color.Primary">Наружная</MudRadio>
-                                    </div>
-                                    <div class="d-block">
-                                        <MudRadio Value="@(CuttingType.Internal)" Color="Color.Primary">Внутренняя</MudRadio>
-                                    </div>
-                                </div>
-                            </MudRadioGroup>
-                        </MudItem>
-                        <MudItem xs="12" sm="9" md="10" Class="mt-n3">
-                            <MudTextField Class="monofield" @bind-Value="ThreadDiameterString" Label="Диаметр" Adornment="Adornment.End" AdornmentText="мм" Variant="Variant.Text" Immediate="true" />
-                            <MudTextField Class="monofield" @bind-Value="ThreadPitchString" Label="Шаг" Adornment="Adornment.End" AdornmentText="мм" Variant="Variant.Text" Immediate="true" />
-                        </MudItem>
-                    </MudHidden>
-                    <MudHidden Breakpoint="Breakpoint.Xs" Invert="true">
-                        <MudItem xs="12" sm="4" md="3">
-                            <MudRadioGroup @bind-Value="ThreadType" Class="mt-2 mb-n2 d-flex justify-center">
-                                <MudRadio Value="@(CuttingType.External)" Color="Color.Primary">Наружная</MudRadio>
-                                <MudRadio Value="@(CuttingType.Internal)" Color="Color.Primary">Внутренняя</MudRadio>
-                            </MudRadioGroup>
-                        </MudItem>
-                        <MudItem xs="12" sm="8" md="9">
-                            <MudTextField Class="monofield" @bind-Value="ThreadDiameterString" Label="Диаметр" Adornment="Adornment.End" AdornmentText="мм" Variant="Variant.Text" Immediate="true" />
-                            <MudTextField Class="monofield" @bind-Value="ThreadPitchString" Label="Шаг" Adornment="Adornment.End" AdornmentText="мм" Variant="Variant.Text" Immediate="true" />
-                        </MudItem>
-                    </MudHidden>
-                </MudGrid>
+        <MudItem xs="12" sm="6">
+            <MudField Label="Параметры резьбы" Variant="Variant.Filled" Underline="false" Class="mt-1">
+                <MudRadioGroup @bind-Value="ThreadType" Class="mb-n2 d-flex justify-center">
+                    <MudRadio Value="@(CuttingType.External)" Color="Color.Primary">Наружная</MudRadio>
+                    <MudRadio Value="@(CuttingType.Internal)" Color="Color.Primary">Внутренняя</MudRadio>
+                </MudRadioGroup>
+                <MudTextField Class="monofield" @bind-Value="ThreadDiameterString" Label="Диаметр" Adornment="Adornment.End" AdornmentText="мм" Variant="Variant.Text" Immediate="true" Margin="Margin.Dense" @onfocus="@(() => _sketchActive = "diameter")" />
+                <MudTextField Class="monofield" @bind-Value="ThreadPitchString" Label="Шаг" Adornment="Adornment.End" AdornmentText="мм" Variant="Variant.Text" Immediate="true" Margin="Margin.Dense" @onfocus="@(() => _sketchActive = "pitch")" />
             </MudField>
+        </MudItem>
+        <MudItem xs="12" sm="6">
+            <ThreadSketch Internal="@(ThreadType == CuttingType.Internal)" ProfileAngle="@ProfileAngle" Active="@_sketchActive" />
         </MudItem>
 
     </MudGrid>
@@ -412,6 +389,18 @@
 @code
 {
     System.Threading.CancellationTokenSource _cts = new();
+
+    /// <summary> Размер на эскизе, соответствующий полю в фокусе. </summary>
+    private string? _sketchActive;
+
+    /// <summary> Угол профиля для эскиза: 55° у трубных, 30° у трапецеидальной, остальные — 60°. </summary>
+    private double ProfileAngle => ThreadStandard switch
+    {
+        ThreadStandard.BSPP or ThreadStandard.BSPT => 55,
+        ThreadStandard.Trapezoidal => 30,
+        _ => 60,
+    };
+
     private bool _materialsDialogOpen = false;
     private string _materialsDialogTitle = "";
     private List<string> _materialsDialogItems = new();
